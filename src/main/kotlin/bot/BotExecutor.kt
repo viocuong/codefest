@@ -16,19 +16,17 @@ enum class Event(val value: String) {
     DRIVE("drive player")
 }
 
-
-//class FullAttack : AttackStrategy() {
-//    override fun attack(command: List<Command>) {
-//
-//    }
-//}
-
 class BotExecutor {
     private var gameInfo: GameInfo? = null
     private var botSocket: Socket? = null
     private var gameJob: Job? = null
     private var coroutineScope: CoroutineScope? = null
+    private var botHandler: BotHandler = BotHandler()
+    private var player: Player? = null
+    private var competitor: Player? = null
+    private var playerId: String? = null
     suspend fun initGame(host: String, playerInfo: PlayerInfo) {
+        playerId = playerInfo.gameId
         coroutineScope {
             BotSocket.initSocket(host = host) {
                 botSocket = this
@@ -46,22 +44,94 @@ class BotExecutor {
             }
             botSocket?.onFLow(Event.TICK_TACK.value)
                 ?.distinctUntilChanged { old, new ->
-                    JsonConverter.fromJson<GameInfo>(old)?.timestamp == JsonConverter.fromJson<GameInfo>(new)?.timestamp
+                    JsonConverter.fromJson<GameInfo>(
+                        old,
+                        GameTagAdapter(),
+                        ItemAdapter(),
+                        SpoilTypeAdapter()
+                    )?.timestamp == JsonConverter.fromJson<GameInfo>(
+                        new, GameTagAdapter(),
+                        ItemAdapter(),
+                        SpoilTypeAdapter()
+                    )?.timestamp
                 }
                 ?.collect { data ->
                     println(data.toString())
-                    gameInfo = JsonConverter.fromJson<GameInfo>(
+                    JsonConverter.fromJson<GameInfo>(
                         data,
                         GameTagAdapter(),
                         ItemAdapter(),
-                    )
-                    if (gameInfo?.tag == GameTag.START_GAME) {
-                        playBot()
+                        SpoilTypeAdapter()
+                    )?.let { gameInfo ->
+                        this@BotExecutor.gameInfo = gameInfo
+                        onReceiveGame(gameInfo)
                     }
 
                     // println("map info: ${gameInfo}")
                 }
         }
+    }
+
+    private fun onReceiveGame(gameInfo: GameInfo) {
+        when (gameInfo.tag) {
+            GameTag.START_GAME -> {
+                println("START GAME")
+                startMove()
+            }
+
+            GameTag.PLAYER_STOP_MOVING -> {
+                //startMove()
+            }
+
+            else -> {}
+        }
+    }
+
+    private fun startMove(){
+        gameInfo?:return
+        val direction = botHandler.move(
+            mapInfo = gameInfo!!.mapInfo,
+            currentPosition = player?.currentPosition ?: return,
+            targetPredicate = { position ->
+                if (checkSpoilNeedGet(position, gameInfo!!.mapInfo.spoils)) {
+                    true to Command.STOP
+                }
+                if (checkPositionIsNearBalk(
+                        mapInfo = gameInfo!!.mapInfo,
+                        position = player?.currentPosition ?: Position(0, 0)
+                    )
+                ) {
+                    true to Command.BOMB
+                }
+                false to Command.STOP
+            }
+        ).toDirection().toJson()
+        println("Direction is ${direction}")
+        botSocket?.emit(Event.DRIVE.value, direction)
+    }
+
+    private fun checkPositionIsNearBalk(mapInfo: MapInfo, position: Position): Boolean {
+        mapInfo.map ?: return false
+        for (i in 0 until 4) {
+            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+            if (mapInfo.map[nextPosition.row][nextPosition.col] == ItemType.BALK) {
+                return true
+            }
+        }
+        return false
+    }
+
+    // TODO update strategy, [DELAY_TIME_DRAGON_EGG, MYSTIC_DRAGON_EGG]
+    private fun checkSpoilNeedGet(position: Position, spoils: List<Spoil>?): Boolean {
+        spoils ?: return false
+        if (spoils.any { it.spoilType == SpoilType.SPEED_DRAGON_EGG && it.row == position.row && it.col == position.col }) {
+            return true
+        }
+        return spoils.any { it.spoilType == SpoilType.ATTACK_DRAGON_EGG && it.row == position.row && it.col == position.col }
+    }
+
+    private fun handleStartGame(gameInfo: GameInfo) {
+
     }
 
     private suspend fun playBot() {
@@ -78,5 +148,6 @@ class BotExecutor {
 
     companion object {
         private const val DELAY_INTERVAL = 500L
+        private val adapterCustoms = listOf(GameTagAdapter(), ItemAdapter(), SpoilTypeAdapter())
     }
 }
