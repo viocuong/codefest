@@ -1,11 +1,12 @@
 import bot.BotExecutor
+import bot.model.PlayerInfo
 import kotlinx.coroutines.runBlocking
-import model.PlayerInfo
+import java.io.IOException
 
 fun main(args: Array<String>): Unit = runBlocking {
     val botExecutor = BotExecutor()
     botExecutor.initGame(
         host = "http://localhost",
-        playerInfo = PlayerInfo(gameId = "6ce18bd6-d2d3-446f-8628-30f3f47b4d01", playerId = "player2-xxx"),
+        playerInfo = PlayerInfo(gameId = "49db2638-d0be-4c65-8094-d06ca7656e09", playerId = "player2-xxx"),
     )
 }

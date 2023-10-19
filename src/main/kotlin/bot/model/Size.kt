@@ -1,8 +1,9 @@
-package model
+package bot.model
 
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
-data class Direction(
-    val direction: String
+data class Size(
+    val cols: Int,
+    val rows: Int
 )

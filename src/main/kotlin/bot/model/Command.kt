@@ -1,4 +1,4 @@
-package model
+package bot.model
 
 enum class Command(val value: String) {
     LEFT("1"),

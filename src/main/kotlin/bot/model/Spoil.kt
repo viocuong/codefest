@@ -1,13 +1,14 @@
-package model
+package bot.model
 
 import com.squareup.moshi.FromJson
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
-
 @JsonClass(generateAdapter = true)
 data class Spoil(
-    val row: Int,
     val col: Int,
-    val spoilType: SpoilType
+    val row: Int,
+    @Json(name = "spoil_type")
+    val spoilType: SpoilType?
 )
 
 enum class SpoilType(val value: Int) {
