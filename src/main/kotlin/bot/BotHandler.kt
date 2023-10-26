@@ -3,7 +3,6 @@ package bot
 import bot.model.*
 import java.util.*
 import kotlin.collections.HashMap
-import kotlin.math.abs
 
 val dx = listOf(0, -1, 0, 1)
 val dy = listOf(-1, 0, 1, 0)
@@ -19,8 +18,11 @@ class BotHandler {
         gameInfo: GameInfo,
         targetPredicate: suspend (position: Position) -> TargetPredicate,
         onDeterminedTargetPos: suspend (Position) -> Unit = {},
+        canDropBomb: Boolean,
     ): List<Position> {
         val playerPosition = gameInfo.player.currentPosition
+        val beginTargetPredicate = targetPredicate(playerPosition)
+        if (beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(playerPosition.copy(command = Command.BOMB))
         val competitorPosition = gameInfo.competitor.currentPosition
         val visits: List<MutableList<Boolean>> =
             List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { false } }
@@ -28,6 +30,7 @@ class BotHandler {
         val paths: HashMap<Position?, Position?> = hashMapOf()
         visits[playerPosition.row][playerPosition.col] = true
         moveQueue.add(playerPosition)
+        //val playerIsFreeze = checkPlayerFreezeMove(gameInfo)
         // Stop when continue check next action
         while (moveQueue.isNotEmpty()) {
             val position = moveQueue.poll()
@@ -37,12 +40,14 @@ class BotHandler {
                     col = position.col + dy[i],
                     command = getCommand(i)
                 )
-                if (checkIsInbound(nextPosition, gameInfo.mapInfo) && checkCanIsTarget(
+                if (gameInfo.checkPositionIsInbound(nextPosition) &&
+                    !visits[nextPosition.row][nextPosition.col] &&
+                    checkCanMove(
                         position = nextPosition,
-                        mapSize = gameInfo.mapInfo.size,
                         competitorPosition = competitorPosition,
-                        mapInfo = gameInfo.mapInfo
-                    ) && !visits[nextPosition.row][nextPosition.col]
+                        gameInfo = gameInfo,
+                        forceMoveOverBomb = gameInfo.checkPlayerAtBombPos()
+                    )
                 ) {
                     visits[nextPosition.row][nextPosition.col] = true
                     paths[nextPosition] = position
@@ -55,11 +60,9 @@ class BotHandler {
                             paths = paths,
                             targetPos = nextPosition
                         ).toMutableList()
-                        // If not move then remove the command move before that
-                        println("positions target is $positions, targetPredicate = $targetPredicateRes, current pos = ${gameInfo.mapInfo}")
                         onDeterminedTargetPos(positions.last())
                         return positions.toMutableList().apply {
-                            targetPredicateRes.commandNeedPerformed?.let{command ->
+                            targetPredicateRes.commandNeedPerformed?.let { command ->
                                 add(last().copy(command = command))
                             }
                         }
@@ -68,6 +71,47 @@ class BotHandler {
             }
         }
         return listOf()
+    }
+
+
+    private fun checkPlayerFreezeMove(gameInfo: GameInfo): Boolean {
+        if (!gameInfo.checkIsNearBomb()) return false
+        val currentPosition = gameInfo.player.currentPosition
+        val leftPosition = Position(row = currentPosition.row, col = currentPosition.col - 1)
+        val rightPosition = Position(row = currentPosition.row, col = currentPosition.col + 1)
+        val upPosition = Position(row = currentPosition.row - 1, col = currentPosition.col)
+        val downPosition = Position(row = currentPosition.row + 1, col = currentPosition.col)
+        val bombAtPlayer =
+            gameInfo.mapInfo.bombs.first { it.row == currentPosition.row || it.col == currentPosition.col }
+        if (bombAtPlayer.row == currentPosition.row) {
+            return !checkCanMove(
+                position = leftPosition,
+                competitorPosition = gameInfo.competitor.currentPosition,
+                gameInfo = gameInfo,
+                forceMoveOverBomb = true,
+            ) &&
+                    !checkCanMove(
+                        position = rightPosition,
+                        competitorPosition = gameInfo.competitor.currentPosition,
+                        gameInfo = gameInfo,
+                        forceMoveOverBomb = true,
+                    )
+        }
+        if (bombAtPlayer.col == currentPosition.col) {
+            return !checkCanMove(
+                position = upPosition,
+                competitorPosition = gameInfo.competitor.currentPosition,
+                gameInfo = gameInfo.copy(),
+                forceMoveOverBomb = true,
+            ) &&
+                    !checkCanMove(
+                        position = downPosition,
+                        competitorPosition = gameInfo.competitor.currentPosition,
+                        gameInfo = gameInfo,
+                        forceMoveOverBomb = true,
+                    )
+        }
+        return false
     }
 
     private fun getPositions(
@@ -83,41 +127,24 @@ class BotHandler {
         }.reversed()
     }
 
-    private fun checkPositionIsSpoil(mapInfo: MapInfo, spoilType: SpoilType?, position: Position): Boolean {
-        return mapInfo.spoils?.any {
-            it.row == position.row && it.col == position.col && it.spoilType == spoilType
-        } ?: false
-    }
-
-    private fun checkIsInbound(position: Position, mapInfo: MapInfo): Boolean {
-        return position.row >= 0 && position.row < mapInfo.size.rows && position.col >= 0 && position.col < mapInfo.size.cols
-    }
-
     // Check whether if the position can move in, or drop bombs to eat items
-    private fun checkCanIsTarget(
+    private fun checkCanMove(
         position: Position,
-        mapSize: Size,
         competitorPosition: Position,
-        mapInfo: MapInfo
+        gameInfo: GameInfo,
+        forceMoveOverBomb: Boolean = false
     ): Boolean {
-        val item = mapInfo.map[position.row][position.col]
+        val item = gameInfo.mapInfo.map[position.row][position.col]
+        val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
-//        if (checkIsNearBomb(position, mapInfo.bombs)) return false
+        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position)) return false
         return !listOf(
             ItemType.BALK,
             ItemType.WALL,
             ItemType.QUARANTINE_PLACE,
             ItemType.TELEPORT_GATE,
             ItemType.DRAGON_EGG_GST
-        ).contains(item)
-    }
-
-    private fun checkIsNearBomb(position: Position, bombs: List<Bomb>): Boolean {
-        val distancePlayerToBomb = 1
-        return bombs.any { bomb ->
-            (position.row == bomb.row && abs(position.col - bomb.col) <= distancePlayerToBomb) ||
-                    (position.col == bomb.col && abs(position.row - bomb.row) <= distancePlayerToBomb)
-        }
+        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
     }
 
     private fun getCommand(dxyIndex: Int): Command {
