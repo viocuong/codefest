@@ -2,6 +2,7 @@ package bot
 
 import bot.model.*
 import io.socket.client.Socket
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import utils.JsonConverter
@@ -48,11 +49,8 @@ class BotExecutor {
     }
 
     private suspend fun onReceiveGame(gameInfo: GameInfo) {
-//        println("game info is $gameInfo")
-//        println("game tag is ${gameInfo.tag}")
         when (gameInfo.tag) {
             GameTag.PLAYER_BACK_TO_PLAY -> {
-//                targetPosition = player?.currentPosition
             }
 
             GameTag.START_GAME -> {
@@ -71,12 +69,7 @@ class BotExecutor {
 
             else -> {}
         }
-        println("target position = $targetPosition, current position = ${gameInfo.player.currentPosition}")
-
-//        if (gameInfo.timestamp - timestampLast > 3000) {
         startMove(gameInfo)
-//        }
-
     }
 
     private var timestampLast = 0L
@@ -84,53 +77,141 @@ class BotExecutor {
     private var targetPosition: Position? = null
     private var isMoving: Boolean = false
 
-    private suspend fun startMove(gameInfo: GameInfo) {
-        isMoving = true
-        val positions = botHandler.move(
-            gameInfo = gameInfo,
-            targetPredicate = { position ->
-                getTargetPredicate(position, gameInfo)
-            },
-            onDeterminedTargetPos = {},
-            canDropBomb = gameInfo.timestamp - dropBombLastTime <= (gameInfo.player.delay)
-        )
-        isMoving = false
-        if (positions.isEmpty()) return
-        targetPosition = positions.last().copy(command = null)
-        val commandsResult = positions.mapNotNull(Position::command)
-
-        println("Direction is ${commandsResult.toDirection().toJson()}")
-//        currentDirection = commandsResult.toDirection()
-//        botSocket?.emit(Event.DRIVE.value, listOf(Command.STOP).toDirection().toJson())
-        botSocket?.emit(Event.DRIVE.value, Direction(commandsResult.first().value).toJson())
+    class AvoidBombStrategy : StrategyMove {
+        override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+            val isSafePosition = !gameInfo.checkIsNearBomb(position)
+            println("Player is near bomb position = $position, isSafe $isSafePosition")
+            return TargetPredicate(
+                isTarget = isSafePosition
+            )
+        }
     }
 
-    private suspend fun getCommandGotoSafeZone(gameInfo: GameInfo, bombPosition: Position): List<Position> {
-        gameInfo.mapInfo.bombs.add(
-            Bomb(
-                col = bombPosition.col,
-                row = bombPosition.row,
-                playerId = gameInfo.playerId ?: "",
-                remainTime = 0
-            )
-        )
-        gameInfo.player.currentPosition = bombPosition.copy(command = null)
-        return botHandler.move(
-            canDropBomb = gameInfo.timestamp - dropBombLastTime <= (gameInfo.player.delay),
-            gameInfo = gameInfo,
-            targetPredicate = { position ->
-                val isSafePosition = !gameInfo.checkIsNearBomb(position)
-                println("Player is near bomb, isSafe $isSafePosition")
-                TargetPredicate(
-                    isTarget = isSafePosition
+    class AvoidBombAndGetSpoil : StrategyMove {
+        override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+            val isSafePosition = !gameInfo.checkIsNearBomb(position) && gameInfo.checkSpoilNeedGet(
+                position,
+                spoilsNeedGet = listOf(
+                    SpoilType.ATTACK_DRAGON_EGG,
+                    SpoilType.SPEED_DRAGON_EGG,
+                    SpoilType.DELAY_TIME_DRAGON_EGG
                 )
+            )
+            println("Player is near bomb, isSafe $isSafePosition")
+            return TargetPredicate(
+                isTarget = isSafePosition
+            )
+        }
+    }
+
+    class DropBombStrategy : StrategyMove {
+        override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+            val isPositionNeedDropBomb = gameInfo.checkPositionIsNearBalk(
+                position = position
+            )
+            if (!isPositionNeedDropBomb) return TargetPredicate()
+            return if (gameInfo.getBombRemainTimePlayer() >= 0) {
+                TargetPredicate()
+            } else {
+                TargetPredicate(isTarget = true, commandNeedPerformed = Command.BOMB)
             }
-        ).ifEmpty { listOf(bombPosition) }
+        }
+    }
+
+    class AttackCompetitorEggStrategy : StrategyMove {
+        override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+            val isPositionNeedAttack = gameInfo.checkPositionIsNearCompetitorEgg(
+                position = position
+            )
+            if (!isPositionNeedAttack) return TargetPredicate()
+            return if (gameInfo.getBombRemainTimePlayer() >= 0) {
+                TargetPredicate()
+            } else {
+                TargetPredicate(isTarget = true, commandNeedPerformed = Command.BOMB)
+            }
+        }
+    }
+
+    class GetSpoilsStrategy : StrategyMove {
+        override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+            val isPositionHaveSpoilNeedGet = gameInfo.checkSpoilNeedGet(
+                position,
+                spoilsNeedGet = listOf(
+                    SpoilType.ATTACK_DRAGON_EGG,
+                    SpoilType.SPEED_DRAGON_EGG,
+                    SpoilType.DELAY_TIME_DRAGON_EGG
+                )
+            )
+            return TargetPredicate(isTarget = isPositionHaveSpoilNeedGet)
+        }
+    }
+
+    private val dropBombStrategy = DropBombStrategy()
+
+    interface StrategyMove {
+        fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate
+    }
+
+    private suspend fun startMove(gameInfo: GameInfo) {
+        // Check if player is dangerous, and move to safe zone.
+        println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
+        if (gameInfo.checkIsNearBomb()) {
+            val safeCommands =
+                botHandler.move(gameInfo = gameInfo, targetPredicate = AvoidBombStrategy(), isNearBomb = true)
+            val bestAndSafeCommand =
+                botHandler.move(gameInfo = gameInfo, isNearBomb = true, targetPredicate = AvoidBombAndGetSpoil())
+            val command = if (bestAndSafeCommand.isNotEmpty()) {
+                bestAndSafeCommand.firstOrNull()
+            } else {
+                safeCommands.firstOrNull()
+            }
+            println("Avoid BOMB direct" + safeCommands)
+            sendCommand(command)
+            return
+        }
+
+//        // Drop bomb if player position can drop bomb.
+//        if (dropBombStrategy.predicate(gameInfo = gameInfo, position = gameInfo.player.currentPosition).isTarget) {
+//            println("PLACE BOMB")
+//            sendCommand(Command.BOMB)
+//            return
+//        }
+
+        // Move to an advantageous position
+        val dropBombDirections = botHandler.move(gameInfo = gameInfo, targetPredicate = DropBombStrategy())
+        val getSpoilDirections = botHandler.move(gameInfo = gameInfo, targetPredicate = GetSpoilsStrategy())
+        println("DROP bomb = $dropBombDirections")
+        println("GET spoil = $getSpoilDirections")
+
+        // If can't get spoil and drop bomb, perform attack competitor egg.
+        if (dropBombDirections.isEmpty() && getSpoilDirections.isEmpty()) {
+            val directionsAttach = botHandler.move(gameInfo = gameInfo, targetPredicate = AttackCompetitorEggStrategy())
+            sendCommand(directionsAttach.firstOrNull())
+            return
+        }
+        val command =
+            if (getSpoilDirections.isNotEmpty() && (dropBombDirections.isEmpty() || getSpoilDirections.size <= dropBombDirections.size)) {
+                println("GET SPOIL = $getSpoilDirections")
+                getSpoilDirections.firstOrNull()
+            } else {
+                println("DROP BOMB = $dropBombDirections")
+                dropBombDirections.firstOrNull()
+            }
+        sendCommand(command)
+//        isMoving = false
+//        if (positions.isEmpty()) return
+//        targetPosition = positions.last().copy(command = null)
+//        val commandsResult = positions.mapNotNull(Position::command)
+//        println("Direction is ${commandsResult.toDirection().toJson()}")
+//        botSocket?.emit(Event.DRIVE.value, Direction(commandsResult.first().value).toJson())
     }
 
     private var dropBombLastTime = 0L
 
-    private fun sendCommand(command: Command) {
+    private fun sendCommand(command: Command?) {
+        isMoving = false
+        println("COMMAND = $command")
+        command ?: return
         botSocket?.emit(Event.DRIVE.value, Direction(command.value).toJson())
     }
 
@@ -147,7 +228,6 @@ class BotExecutor {
                 isTarget = isSafePosition
             )
         }
-//        println("startMove position = $position")
         return when {
             gameInfo.checkSpoilNeedGet(
                 position,
@@ -165,7 +245,7 @@ class BotExecutor {
                 position = position
             ) -> {
                 println(" checkPositionIsNearBalk true, gameTimeStamp = ${gameInfo.timestamp}, dropbombLastime = $dropBombLastTime")
-                (if (gameInfo.getBombRemainTimePlayer()>= 0) {
+                (if (gameInfo.getBombRemainTimePlayer() >= 0) {
                     TargetPredicate()
                 } else {
                     TargetPredicate(isTarget = true, commandNeedPerformed = Command.BOMB)

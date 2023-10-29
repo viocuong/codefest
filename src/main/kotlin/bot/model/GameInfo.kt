@@ -25,11 +25,44 @@ data class GameInfo(
     val competitorBombs: List<Bomb> get() = mapInfo.bombs.filter { it.playerId != playerId }
     val isActionOfPlayer: Boolean get() = playerIdOfAction == playerId
     fun checkPlayerAtBombPos(): Boolean {
-        return mapInfo.bombs.filter { it.playerId == playerId }
-            .any { it.col == player.currentPosition.col && it.row == player.currentPosition.row }
+        return checkIsNearBomb()
+    }
+
+    fun checkPositionIsNearCompetitorEgg(position: Position): Boolean {
+        val competitorEgg = mapInfo.dragonEggGSTArray.firstOrNull { it.id != playerId } ?: return false
+        for (i in 0 until 4) {
+            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+            if (checkPositionInbound(nextPosition) && competitorEgg.row == nextPosition.row && competitorEgg.col == nextPosition.col) {
+                return true
+            }
+        }
+        return false
     }
 
     fun checkPositionIsNearBalk(position: Position): Boolean {
+//        val length = lengthOfBomb
+//        var atLeft: Boolean? = null
+//        var atTop: Boolean? = null
+//        var atRight: Boolean? = null
+//        var atBottom: Boolean? = null
+//        for (i in 1 until length) {
+//            val left = position.col - i
+//            val right = position.col + i
+//            val top = position.row - i
+//            val bottom = position.row + i
+//            atLeft = atLeft != false && checkPositionIsItem(
+//                Position(row = position.row, col = left),
+//                item = ItemType.BALK
+//            )
+//            atRight = atRight != false &&
+//                    checkPositionIsItem(Position(row = position.row, col = right), item = ItemType.BALK)
+//            atTop = atTop != false && checkPositionIsItem(Position(col = position.col, row = top), item = ItemType.BALK)
+//            atBottom = atBottom != false && checkPositionIsItem(
+//                Position(col = position.col, row = bottom),
+//                item = ItemType.BALK
+//            )
+//        }
+//        return atLeft == true || atRight == true || atTop == true || atBottom == true
         for (i in 0 until 4) {
             val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
 
@@ -52,19 +85,18 @@ data class GameInfo(
     }
 
     private fun checkPositionIsItem(position: Position, item: ItemType): Boolean =
-        mapInfo.map[position.row][position.col] == item
+        mapInfo.map.getOrNull(position.row)?.getOrNull(position.col) == item
 
+    private val lengthOfBomb: Int get() = (player.dragonEggAttack + MIN_LENGTH_ATTACK).coerceAtMost(MAX_LENGTH_ATTACK)
 
     /**
      * Check position is near bomb.
      */
     fun checkIsNearBomb(position: Position): Boolean {
-        val distancePlayerToBomb =
-            player.dragonEggAttack.coerceAtMost(MAX_LENGTH_ATTACK).coerceAtLeast(MIN_LENGTH_ATTACK)
         return mapInfo.bombs.any { bomb ->
-            (position.row == bomb.row && abs(position.col - bomb.col + 1) <= distancePlayerToBomb) || (position.col == bomb.col && abs(
-                position.row - bomb.row + 1
-            ) <= distancePlayerToBomb)
+            (position.row == bomb.row && abs(position.col - bomb.col) < lengthOfBomb) || (position.col == bomb.col && abs(
+                position.row - bomb.row
+            ) < lengthOfBomb)
         }
     }
 
