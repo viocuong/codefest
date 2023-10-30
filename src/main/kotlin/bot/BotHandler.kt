@@ -137,7 +137,7 @@ class BotHandler {
         // TODO remove comment if can move over competitor.
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
         println("player = ${gameInfo.playerId}, checkNearBomb")
-        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position)) return false
+        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position, false)) return false
         println("player = ${gameInfo.playerId}, check is Mystic egg")
         if (forceMoveOverBomb && spoilItem?.spoilType == SpoilType.MYSTIC_DRAGON_EGG) return true
         println("player = ${gameInfo.playerId}, check is not move, item = $item")

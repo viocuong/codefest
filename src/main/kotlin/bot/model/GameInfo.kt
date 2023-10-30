@@ -7,6 +7,8 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import utils.JsonConverter.toJson
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 
 @JsonClass(generateAdapter = true)
 data class GameInfo(
@@ -30,13 +32,40 @@ data class GameInfo(
 
     fun checkPositionIsNearCompetitorEgg(position: Position): Boolean {
         val competitorEgg = mapInfo.dragonEggGSTArray.firstOrNull { it.id != playerId } ?: return false
-        for (i in 0 until 4) {
-            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
-            if (checkPositionInbound(nextPosition) && competitorEgg.row == nextPosition.row && competitorEgg.col == nextPosition.col) {
-                return true
+        val canVerticalAttack =
+            (position.col == competitorEgg.col && abs(position.row - competitorEgg.row) < lengthOfBomb)
+        val canHorizontalAttack =
+            (position.row == competitorEgg.row && abs(position.col - competitorEgg.col) < lengthOfBomb)
+        var hasWallOnVerticalAttack = false
+        var hasWallOnHorizontalAttack = false
+        if (canVerticalAttack) {
+            var index = min(position.row, competitorEgg.row)
+            val lastIndex = max(position.row, competitorEgg.row)
+            while (index++ < lastIndex) {
+                if (mapInfo.map[index][position.col] == ItemType.WALL) {
+                    hasWallOnVerticalAttack = true
+                    break
+                }
             }
         }
-        return false
+        if (canHorizontalAttack) {
+            var index = min(position.col, competitorEgg.col)
+            val lastIndex = max(position.col, competitorEgg.col)
+            while (index++ < lastIndex) {
+                if (mapInfo.map[position.row][index] == ItemType.WALL) {
+                    hasWallOnHorizontalAttack = true
+                    break
+                }
+            }
+        }
+        return (canVerticalAttack && !hasWallOnVerticalAttack) || (canHorizontalAttack && !hasWallOnHorizontalAttack)
+//        for (i in 0 until 4) {
+//            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+//            if (checkPositionInbound(nextPosition) && competitorEgg.row == nextPosition.row && competitorEgg.col == nextPosition.col) {
+//                return true
+//            }
+//        }
+//        return false
     }
 
     fun checkPositionIsNearBalk(position: Position): Boolean {
@@ -87,16 +116,24 @@ data class GameInfo(
     private fun checkPositionIsItem(position: Position, item: ItemType): Boolean =
         mapInfo.map.getOrNull(position.row)?.getOrNull(position.col) == item
 
-    private val lengthOfBomb: Int get() = (player.dragonEggAttack + MIN_LENGTH_ATTACK).coerceAtMost(MAX_LENGTH_ATTACK)
+    private val lengthOfBomb: Int get() = player.power + 1
 
     /**
      * Check position is near bomb.
      */
-    fun checkIsNearBomb(position: Position): Boolean {
+    fun checkIsNearBomb(position: Position, checkCanMoveBombByTime: Boolean = false): Boolean {
         return mapInfo.bombs.any { bomb ->
-            (position.row == bomb.row && abs(position.col - bomb.col) < lengthOfBomb) || (position.col == bomb.col && abs(
-                position.row - bomb.row
-            ) < lengthOfBomb)
+            val isNearBom =
+                (position.row == bomb.row && abs(position.col - bomb.col) < lengthOfBomb) || (position.col == bomb.col && abs(
+                    position.row - bomb.row
+                ) < lengthOfBomb)
+            val canMoveOverBomb = bomb.remainTime >= 600
+            if (checkCanMoveBombByTime) {
+                isNearBom && (!canMoveOverBomb)
+            } else {
+                isNearBom
+            }
+
         }
     }
 
@@ -126,7 +163,7 @@ data class GameInfo(
     }
 
     companion object {
-        private const val MAX_LENGTH_ATTACK = 4
+        private const val MAX_LENGTH_ATTACK = 5
         private const val MIN_LENGTH_ATTACK = 2
     }
 }

@@ -7,5 +7,7 @@ data class Bomb(
     val col: Int,
     val playerId: String,
     val remainTime: Int,
-    val row: Int
+    val row: Int,
+    @Transient
+    val timestamp: Long = 0
 )
