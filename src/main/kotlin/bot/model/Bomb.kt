@@ -9,5 +9,7 @@ data class Bomb(
     val remainTime: Int,
     val row: Int,
     @Transient
-    val timestamp: Long = 0
-)
+    val endExposedTime: Long = 0
+){
+    val identify: String get() = "$col-$row-$playerId"
+}

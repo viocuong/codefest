@@ -1,6 +1,7 @@
 package bot
 
 import bot.model.*
+import bot.strategys.StrategyMove
 import java.util.*
 import kotlin.collections.HashMap
 
@@ -11,12 +12,12 @@ data class TargetPredicate(
     val isTarget: Boolean = false, val commandNeedPerformed: Command? = null
 )
 
-class BotHandler {
+object BotHandler {
 //    abstract fun attack(command: List<Command>)
 
     fun move(
         gameInfo: GameInfo,
-        targetPredicate: BotExecutor.StrategyMove,
+        targetPredicate: StrategyMove,
         isNearBomb: Boolean = false,
     ): List<Command> {
         val playerPosition = gameInfo.player.currentPosition
@@ -46,7 +47,7 @@ class BotHandler {
                         position = nextPosition,
                         competitorPosition = competitorPosition,
                         gameInfo = gameInfo,
-                        forceMoveOverBomb = isNearBomb || playerIsFreeze
+                        forceMoveOverBomb = isNearBomb || playerIsFreeze,
                     )
                 ) {
                     visits[nextPosition.row][nextPosition.col] = true
@@ -78,8 +79,8 @@ class BotHandler {
         val upPosition = Position(row = currentPosition.row - 1, col = currentPosition.col)
         val downPosition = Position(row = currentPosition.row + 1, col = currentPosition.col)
         val bombAtPlayer =
-            gameInfo.mapInfo.bombs.first { it.row == currentPosition.row || it.col == currentPosition.col }
-        if (bombAtPlayer.row == currentPosition.row) {
+            gameInfo.mapInfo.bombs.firstOrNull { it.row == currentPosition.row || it.col == currentPosition.col }
+        if (bombAtPlayer?.row == currentPosition.row) {
             return !checkCanMove(
                 position = upPosition,
                 competitorPosition = gameInfo.competitor.currentPosition,
@@ -93,7 +94,7 @@ class BotHandler {
                         forceMoveOverBomb = true,
                     )
         }
-        if (bombAtPlayer.col == currentPosition.col) {
+        if (bombAtPlayer?.col == currentPosition.col) {
             return !checkCanMove(
                 position = leftPosition,
                 competitorPosition = gameInfo.competitor.currentPosition,
@@ -128,7 +129,7 @@ class BotHandler {
         position: Position,
         competitorPosition: Position,
         gameInfo: GameInfo,
-        forceMoveOverBomb: Boolean = false
+        forceMoveOverBomb: Boolean = false,
     ): Boolean {
         println("player = ${gameInfo.playerId}, forceMoveOverBombs = $forceMoveOverBomb, position = $position")
         if (!gameInfo.checkPositionIsInbound(position)) return false

@@ -1,5 +1,6 @@
 package bot.model
 
+import bot.BombManager
 import com.squareup.moshi.FromJson
 import com.squareup.moshi.JsonClass
 
@@ -11,7 +12,7 @@ data class MapInfo(
     val map: List<List<ItemType>> = emptyList(),
     val players: List<Player>,
     val size: Size,
-    val spoils: List<Spoil>
+    val spoils: List<Spoil>,
 )
 
 enum class ItemType(val value: Int) {

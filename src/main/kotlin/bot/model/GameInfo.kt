@@ -1,5 +1,6 @@
 package bot.model
 
+import bot.BombManager
 import bot.dx
 import bot.dy
 import com.squareup.moshi.FromJson
@@ -18,24 +19,32 @@ data class GameInfo(
     val tag: GameTag?,
     val timestamp: Long,
     @Json(name = "player_id") val playerIdOfAction: String?,
-    @Transient val playerId: String? = ""
+    @Transient
+    val playerId: String? = "",
+    @Transient
+    val bombManager: BombManager? = null,
+    @Transient
+    val bombsExposing: List<Bomb> = emptyList(),
+    @Transient
+    val bombs: List<MutableList<Long>> = emptyList()
 ) {
     val player: Player get() = mapInfo.players.first { it.id == playerId }
     val competitor: Player get() = mapInfo.players.first { it.id != playerId }
 
-    val playerBombs: List<Bomb> get() = mapInfo.bombs.filter { it.playerId == playerId }
-    val competitorBombs: List<Bomb> get() = mapInfo.bombs.filter { it.playerId != playerId }
     val isActionOfPlayer: Boolean get() = playerIdOfAction == playerId
-    fun checkPlayerAtBombPos(): Boolean {
-        return checkIsNearBomb()
-    }
 
     fun checkPositionIsNearCompetitorEgg(position: Position): Boolean {
+        if (playerId == "player2-xxx") {
+            println("checkPositionIsNearCompetitorEgg $position")
+        }
         val competitorEgg = mapInfo.dragonEggGSTArray.firstOrNull { it.id != playerId } ?: return false
+        if (playerId == "player2-xxx") {
+            println("checkPositionIsNearCompetitorEgg egg =  $competitorEgg, lengBomb = $lengthOfBomb")
+        }
         val canVerticalAttack =
-            (position.col == competitorEgg.col && abs(position.row - competitorEgg.row) < lengthOfBomb)
+            (position.col == competitorEgg.col && abs(position.row - competitorEgg.row) <= lengthOfBomb)
         val canHorizontalAttack =
-            (position.row == competitorEgg.row && abs(position.col - competitorEgg.col) < lengthOfBomb)
+            (position.row == competitorEgg.row && abs(position.col - competitorEgg.col) <= lengthOfBomb)
         var hasWallOnVerticalAttack = false
         var hasWallOnHorizontalAttack = false
         if (canVerticalAttack) {
@@ -69,6 +78,9 @@ data class GameInfo(
     }
 
     fun checkPositionIsNearBalk(position: Position): Boolean {
+        var numberOfBalkAttacked = 0
+        val itemsBombNotAttackOver = listOf(ItemType.WALL)
+        var index = 1
 //        val length = lengthOfBomb
 //        var atLeft: Boolean? = null
 //        var atTop: Boolean? = null
@@ -102,13 +114,6 @@ data class GameInfo(
         return false
     }
 
-    /**
-     * Return a bomb located on the player position.
-     */
-    fun getBombAtPlayerPosition(): Bomb? {
-        return playerBombs.firstOrNull { player.currentPosition.row == it.row || player.currentPosition.col == it.col }
-    }
-
     private fun checkPositionInbound(position: Position): Boolean {
         return position.row >= 0 && position.row < mapInfo.size.rows && position.col >= 0 && position.col < mapInfo.size.cols
     }
@@ -116,29 +121,54 @@ data class GameInfo(
     private fun checkPositionIsItem(position: Position, item: ItemType): Boolean =
         mapInfo.map.getOrNull(position.row)?.getOrNull(position.col) == item
 
-    private val lengthOfBomb: Int get() = player.power + 1
+    private val lengthOfBomb: Int get() = (player.power).coerceAtLeast(1)
+
+
+    fun checkPositionIsSafe(position: Position): Boolean {
+        return !checkIsNearBomb(position)
+    }
 
     /**
      * Check position is near bomb.
      */
-    fun checkIsNearBomb(position: Position, checkCanMoveBombByTime: Boolean = false): Boolean {
-        return mapInfo.bombs.any { bomb ->
-            val isNearBom =
-                (position.row == bomb.row && abs(position.col - bomb.col) < lengthOfBomb) || (position.col == bomb.col && abs(
-                    position.row - bomb.row
-                ) < lengthOfBomb)
-            val canMoveOverBomb = bomb.remainTime >= 600
-            if (checkCanMoveBombByTime) {
-                isNearBom && (!canMoveOverBomb)
-            } else {
-                isNearBom
+    fun checkIsNearBomb(
+        position: Position,
+        checkCanMoveBombByTime: Boolean = false,
+    ): Boolean {
+        var index = 0
+        while (index <= lengthOfBomb) {
+            val right = position.col + index
+            val left = position.col - index
+            val up = position.row - index
+            val down = position.row + index
+            if (right < bombs[0].size) {
+                if (bombs[position.row][right] > timestamp) return true
             }
-
+            if (left >= 0) {
+                if (bombs[position.row][left] > timestamp) return true
+            }
+            if (up >= 0) {
+                if (bombs[up][position.col] > timestamp) return true
+            }
+            if (down < bombs.size) {
+                if (bombs[down][position.col] > timestamp) return true
+            }
+            index++
         }
-    }
+        return false
 
-    fun getBombRemainTimePlayer(): Int {
-        return mapInfo.bombs.filter { it.playerId == playerId }.maxOfOrNull { it.remainTime } ?: -1
+//        return mapInfo.bombs.any { bomb ->
+//            val isNearBom =
+//                (position.row == bomb.row && abs(position.col - bomb.col) <= lengthOfBomb) || (position.col == bomb.col && abs(
+//                    position.row - bomb.row
+//                ) <= lengthOfBomb)
+//            val canMoveOverBomb = bomb.remainTime >= 600
+//            if (checkCanMoveBombByTime) {
+//                isNearBom && (!canMoveOverBomb)
+//            } else {
+//                isNearBom
+//            }
+//        } ?: true
     }
 
     /**
