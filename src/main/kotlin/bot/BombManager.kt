@@ -17,6 +17,6 @@ class BombManager {
         println("BombManager#updateBombs $bombsTime")
     }
     companion object {
-        private const val BUFFER_TIME_END_OF_BOMB = 600L
+
     }
 }

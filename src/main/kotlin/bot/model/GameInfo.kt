@@ -1,6 +1,7 @@
 package bot.model
 
 import bot.BombManager
+import bot.BotExecutor
 import bot.dx
 import bot.dy
 import com.squareup.moshi.FromJson
@@ -125,7 +126,7 @@ data class GameInfo(
 
 
     fun checkPositionIsSafe(position: Position): Boolean {
-        return !checkIsNearBomb(position)
+        return !checkIsNearBomb(position, noCheckTime = true, avoidBomb = true)
     }
 
     /**
@@ -133,49 +134,68 @@ data class GameInfo(
      */
     fun checkIsNearBomb(
         position: Position,
-        checkCanMoveBombByTime: Boolean = false,
+        noCheckTime: Boolean = false,
+        avoidBomb: Boolean = false,
+        check: Boolean = false,
     ): Boolean {
         var index = 0
+        var bombExposedEarliest = Long.MAX_VALUE
+        val timeBetweenMoves = 200L
+        var minIndex = Long.MAX_VALUE
         while (index <= lengthOfBomb) {
-            val right = position.col + index
-            val left = position.col - index
-            val up = position.row - index
-            val down = position.row + index
-            if (right < bombs[0].size) {
-                if (bombs[position.row][right] > timestamp) return true
-            }
-            if (left >= 0) {
-                if (bombs[position.row][left] > timestamp) return true
-            }
-            if (up >= 0) {
-                if (bombs[up][position.col] > timestamp) return true
-            }
-            if (down < bombs.size) {
-                if (bombs[down][position.col] > timestamp) return true
+            for (i in dx.indices) {
+                val x = position.row + dx[i] * index
+                val y = position.col + dy[i] * index
+                // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
+                if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB> timestamp) {
+                        bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
+//                        return true
+//                        val remain = bombs[x][y] + BotExecutor.COMPLETE_EXPOSED_TIME - timestamp
+//                        if (remain < 1500 + BotExecutor.COMPLETE_EXPOSED_TIME) {
+//                            return true
+//                        }
+//                        bombExposedEarliest =
+//                            minOf(bombExposedEarliest, bombs[x][y] + BotExecutor.COMPLETE_EXPOSED_TIME)
+//                        return true
+                    }
+//                    val isBomb = bombs[x][y] > timestamp
+//                    if (bombs[x][y] > timestamp) return true
+//                    if (isBomb) {
+//                        bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
+//                    }
+                }
             }
             index++
         }
+        // time = 12000, bomb = 14000
+        // time = 13000, bomb = 14000
+        if (bombExposedEarliest == Long.MAX_VALUE) return false
+        if(check){
+            println(
+                """
+            noCheckTime && bombExposedEarliest = ${noCheckTime && bombExposedEarliest > timestamp}
+            avoidBomb && bombExposedEarliest - timestamp in 200..300 = ${avoidBomb && bombExposedEarliest - timestamp in 200..300}
+            bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp = ${bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp}
+        """.trimIndent()
+            )
+        }
+        println("Remain time nocheck")
+        if (noCheckTime && bombExposedEarliest > timestamp) return true
+        println("Avoid && bomb")
+        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
+        println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
+        return bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp
+        // 104000
+        // 102000, 103000, 103900
         return false
-
-//        return mapInfo.bombs.any { bomb ->
-//            val isNearBom =
-//                (position.row == bomb.row && abs(position.col - bomb.col) <= lengthOfBomb) || (position.col == bomb.col && abs(
-//                    position.row - bomb.row
-//                ) <= lengthOfBomb)
-//            val canMoveOverBomb = bomb.remainTime >= 600
-//            if (checkCanMoveBombByTime) {
-//                isNearBom && (!canMoveOverBomb)
-//            } else {
-//                isNearBom
-//            }
-//        } ?: true
     }
 
     /**
      * Check player is near bomb.
      */
-    fun checkIsNearBomb(): Boolean {
-        return checkIsNearBomb(player.currentPosition)
+    fun checkIsNearBomb(noCheckTime: Boolean = false): Boolean {
+        return checkIsNearBomb(player.currentPosition, noCheckTime = noCheckTime)
     }
 
     fun checkPositionIsInbound(position: Position): Boolean {
@@ -195,6 +215,8 @@ data class GameInfo(
     companion object {
         private const val MAX_LENGTH_ATTACK = 5
         private const val MIN_LENGTH_ATTACK = 2
+        private const val BUFFER_TIME_END_OF_BOMB = 500L
+        private const val BOMB_EXPOSED_TIME = 2000L
     }
 }
 

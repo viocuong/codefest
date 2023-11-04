@@ -26,7 +26,7 @@ class BotExecutor {
             botSocket = this
             on(Event.JOIN_GAME.value) { args ->
                 val data = args[0]
-                println("Join game $data")
+//                println("Join game $data")
             }
             on(Socket.EVENT_CONNECT) {
                 emit(
@@ -86,8 +86,7 @@ class BotExecutor {
                     dropBombLastTime = gameInfo.timestamp
                 }
                 gameInfo.mapInfo.bombs.forEach { bomb ->
-                    val exposedEndTime = bomb.remainTime + gameInfo.timestamp + COMPLETE_EXPOSED_TIME
-                    println("timestamp = ${gameInfo.timestamp}, exposedTime = ${exposedEndTime}")
+                    val exposedEndTime = bomb.remainTime + gameInfo.timestamp
                     bombs[bomb.row][bomb.col] = maxOf(bombs[bomb.row][bomb.col], exposedEndTime)
                 }
                 println("BOM SETUP")
@@ -107,7 +106,8 @@ class BotExecutor {
     private suspend fun startMove(gameInfo: GameInfo) {
         // Check if player is dangerous, and move to safe zone.
         println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
-        if (gameInfo.checkIsNearBomb()) {
+        if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
+            val directionsSafe = BotHandler.move(gameInfo = gameInfo, targetPredicate = AvoidBombStrategy())
             val safeCommands =
                 BotHandler.move(
                     gameInfo = gameInfo,
@@ -132,7 +132,7 @@ class BotExecutor {
                     safeCommands.firstOrNull()
                 }
             println("Avoid BOMB direct" + safeCommands)
-            sendCommand(command)
+            sendCommand(command, gameInfo)
             return
         }
 
@@ -154,7 +154,7 @@ class BotExecutor {
                     gameInfo = gameInfo,
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
-            sendCommand(directionsAttach.firstOrNull())
+            sendCommand(directionsAttach.firstOrNull(), gameInfo)
             return
         }
         val command =
@@ -165,17 +165,20 @@ class BotExecutor {
                 println("DROP BOMB = $dropBombDirections")
                 dropBombDirections.firstOrNull()
             }
-        sendCommand(command)
+        sendCommand(command, gameInfo)
     }
 
-    private fun sendCommand(command: Command?) {
+    private fun sendCommand(command: Command?, gameInfo: GameInfo) {
         isMoving = false
         println("COMMAND = $command")
+//        if (command == Command.BOMB) {
+//            bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col] = gameInfo.timestamp + 2200
+//        }
         command ?: return
         botSocket?.emit(Event.DRIVE.value, Direction(command.value).toJson())
     }
 
     companion object {
-        const val COMPLETE_EXPOSED_TIME = 600L
+        const val COMPLETE_EXPOSED_TIME = 700L
     }
 }
