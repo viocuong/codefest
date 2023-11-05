@@ -20,6 +20,7 @@ object BotHandler {
         targetPredicate: StrategyMove,
         isNearBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
+        timeOfCurrentBomb: Long = 0,
     ): List<Command> {
         val playerPosition = gameInfo.player.currentPosition
         val beginTargetPredicate = targetPredicate.predicate(playerPosition, gameInfo)
@@ -36,6 +37,7 @@ object BotHandler {
         // Stop when continue check next action
         while (moveQueue.isNotEmpty()) {
             val position = moveQueue.poll()
+            // Position at bomb line, force move over only this bomb.
             val forceMoveOverBomb = isNearBomb && !checkCanMoveSafe(position, gameInfo)
             for (i in dx.indices) {
                 val nextPosition = Position(
@@ -43,13 +45,17 @@ object BotHandler {
                     col = position.col + dy[i],
                     command = getCommand(i)
                 )
+                val moveOverBomb = forceMoveOverBomb && gameInfo.checkIsNearBomb(
+                    position = nextPosition,
+                    timeOfCurrentBomb = timeOfCurrentBomb
+                )
                 if (gameInfo.checkPositionIsInbound(nextPosition) &&
                     !visits[nextPosition.row][nextPosition.col] &&
                     checkCanMove(
                         position = nextPosition,
                         competitorPosition = competitorPosition,
                         gameInfo = gameInfo,
-                        forceMoveOverBomb = forceMoveOverBomb || playerIsFreeze,
+                        forceMoveOverBomb = moveOverBomb || playerIsFreeze,
                         noCheckTimeOfBomb = noCheckTimeOfBomb
                     )
                 ) {
@@ -145,7 +151,6 @@ object BotHandler {
         if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(
                 position = position,
                 noCheckTime = noCheckTimeOfBomb,
-                check = true
             )
         ) return false
         println("player = ${gameInfo.playerId}, check is Mystic egg")

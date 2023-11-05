@@ -153,7 +153,7 @@ data class GameInfo(
 
 
     fun checkPositionIsSafe(position: Position): Boolean {
-        if(!checkPositionIsInbound(position)) return false
+        if (!checkPositionIsInbound(position)) return false
         return !checkIsNearBomb(position, noCheckTime = true, avoidBomb = true)
     }
 
@@ -163,8 +163,8 @@ data class GameInfo(
     fun checkIsNearBomb(
         position: Position,
         noCheckTime: Boolean = false,
+        timeOfCurrentBomb: Long = 0,
         avoidBomb: Boolean = false,
-        check: Boolean = false,
     ): Boolean {
         var index = 0
         var bombExposedEarliest = Long.MAX_VALUE
@@ -176,6 +176,7 @@ data class GameInfo(
                 val y = position.col + dy[i] * index
                 // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    if (timeOfCurrentBomb > 0 && timeOfCurrentBomb - bombs[x][y] in 1..BUFFER_TIME_END_OF_BOMB) continue
                     if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
                         if (noCheckTime) return true
                         bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
@@ -187,20 +188,31 @@ data class GameInfo(
         // time = 12000, bomb = 14000
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
-        if (check) {
-            println(
-                """
-            noCheckTime && bombExposedEarliest = ${noCheckTime && bombExposedEarliest > timestamp}
-            avoidBomb && bombExposedEarliest - timestamp in 200..300 = ${avoidBomb && bombExposedEarliest - timestamp in 200..300}
-            bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp = ${bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp}
-        """.trimIndent()
-            )
-        }
         println("Remain time nocheck")
         println("Avoid && bomb")
-        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
+//        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
         println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
         return bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp
+    }
+
+    fun checkCanMove(position: Position): Boolean {
+        val item = mapInfo.map[position.row][position.col]
+        val spoilItem = mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
+        return !listOf(
+            ItemType.BALK,
+            ItemType.WALL,
+            ItemType.QUARANTINE_PLACE,
+            ItemType.TELEPORT_GATE,
+            ItemType.DRAGON_EGG_GST
+        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
+    }
+
+    fun checkCanMoveSafe(position: Position): Boolean {
+        for (i in dx.indices) {
+            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+            if (checkPositionIsSafe(nextPosition) && checkCanMove(nextPosition)) return true
+        }
+        return false
     }
 
     /**

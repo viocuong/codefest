@@ -124,18 +124,20 @@ class BotExecutor {
         // Check if player is dangerous, and move to safe zone.
         println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
         if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
-            val directionsSafe = BotHandler.move(gameInfo = gameInfo, targetPredicate = AvoidBombStrategy())
+            val timeOfBomb = gameInfo.bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col]
             val safeCommands =
                 BotHandler.move(
                     gameInfo = gameInfo,
                     targetPredicate = AvoidBombStrategy(),
                     isNearBomb = true,
-                    noCheckTimeOfBomb = true
+                    noCheckTimeOfBomb = true,
+                    timeOfCurrentBomb = timeOfBomb
                 )
             val bestAndSafeCommand =
                 BotHandler.move(
                     gameInfo = gameInfo,
                     targetPredicate = AvoidBombAndGetSpoil(),
+                    timeOfCurrentBomb = timeOfBomb,
                 )
             println(
                 """
