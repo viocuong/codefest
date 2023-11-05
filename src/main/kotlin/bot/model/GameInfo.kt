@@ -176,7 +176,6 @@ data class GameInfo(
                 val y = position.col + dy[i] * index
                 // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
-                    if (timeOfCurrentBomb > 0 && timeOfCurrentBomb - bombs[x][y] in 1..BUFFER_TIME_END_OF_BOMB) continue
                     if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
                         if (noCheckTime) return true
                         bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
@@ -188,6 +187,7 @@ data class GameInfo(
         // time = 12000, bomb = 14000
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
+        if(timeOfCurrentBomb <= bombExposedEarliest) return true
         println("Remain time nocheck")
         println("Avoid && bomb")
 //        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false

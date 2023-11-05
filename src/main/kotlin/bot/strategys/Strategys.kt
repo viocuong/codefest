@@ -60,6 +60,7 @@ class DropBombStrategy(private val dropBombLastTime: Long,private val numberOfBa
                 isNearBomb = false,
                 noCheckTimeOfBomb = true,
             )
+            val canMove = gameInfo.checkCanMoveSafe(position)
             println("START check to drop bomb result = $commandToSafe")
 //            gameInfo.bombs[position.row][position.col] = oldTimeStamp
             val isTarget = if (gameInfo.player.currentPosition == position) {
@@ -68,8 +69,8 @@ class DropBombStrategy(private val dropBombLastTime: Long,private val numberOfBa
                 true
             }
             TargetPredicate(
-                isTarget = (gameInfo.player.currentPosition == position && commandToSafe.isNotEmpty()) || (commandToSafe.isNotEmpty() && gameInfo.player.currentPosition != position),
-                commandNeedPerformed = Command.BOMB.takeIf { isTarget })
+                isTarget = commandToSafe.isNotEmpty() && canMove,
+                commandNeedPerformed = Command.BOMB.takeIf { isTarget && canMove })
         }
     }
 }

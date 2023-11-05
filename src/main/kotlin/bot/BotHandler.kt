@@ -38,7 +38,7 @@ object BotHandler {
         while (moveQueue.isNotEmpty()) {
             val position = moveQueue.poll()
             // Position at bomb line, force move over only this bomb.
-            val forceMoveOverBomb = isNearBomb && !checkCanMoveSafe(position, gameInfo)
+            val forceMoveOverBomb = isNearBomb
             for (i in dx.indices) {
                 val nextPosition = Position(
                     row = position.row + dx[i],
