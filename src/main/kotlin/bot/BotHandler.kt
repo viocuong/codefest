@@ -19,6 +19,7 @@ object BotHandler {
         gameInfo: GameInfo,
         targetPredicate: StrategyMove,
         isNearBomb: Boolean = false,
+        noCheckTimeOfBomb: Boolean = false,
     ): List<Command> {
         val playerPosition = gameInfo.player.currentPosition
         val beginTargetPredicate = targetPredicate.predicate(playerPosition, gameInfo)
@@ -48,6 +49,7 @@ object BotHandler {
                         competitorPosition = competitorPosition,
                         gameInfo = gameInfo,
                         forceMoveOverBomb = isNearBomb || playerIsFreeze,
+                        noCheckTimeOfBomb = noCheckTimeOfBomb
                     )
                 ) {
                     visits[nextPosition.row][nextPosition.col] = true
@@ -130,6 +132,7 @@ object BotHandler {
         competitorPosition: Position,
         gameInfo: GameInfo,
         forceMoveOverBomb: Boolean = false,
+        noCheckTimeOfBomb: Boolean = false,
     ): Boolean {
         println("player = ${gameInfo.playerId}, forceMoveOverBombs = $forceMoveOverBomb, position = $position")
         if (!gameInfo.checkPositionIsInbound(position)) return false
@@ -138,7 +141,7 @@ object BotHandler {
         // TODO remove comment if can move over competitor.
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
         println("player = ${gameInfo.playerId}, checkNearBomb")
-        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position, false, check = true)) return false
+        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position, noCheckTimeOfBomb, check = true)) return false
         println("player = ${gameInfo.playerId}, check is Mystic egg")
         if (forceMoveOverBomb && spoilItem?.spoilType == SpoilType.MYSTIC_DRAGON_EGG) return true
         println("player = ${gameInfo.playerId}, check is not move, item = $item")

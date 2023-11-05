@@ -54,17 +54,23 @@ class DropBombStrategy(private val dropBombLastTime: Long) : StrategyMove {
             )
             println("START check to drop bomb")
             val oldTimeStamp = gameInfo.bombs[position.row][position.col]
-            gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
+            //gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
             val commandToSafe = BotHandler.move(
                 gameInfo = gameInfo,
                 targetPredicate = AvoidBombStrategy(),
-                isNearBomb = true
+                isNearBomb = false,
+                noCheckTimeOfBomb = true
             )
             println("START check to drop bomb result = $commandToSafe")
-            gameInfo.bombs[position.row][position.col] = oldTimeStamp
+            //gameInfo.bombs[position.row][position.col] = oldTimeStamp
+            val isTarget = if (gameInfo.player.currentPosition == position) {
+                commandToSafe.isNotEmpty()
+            } else {
+                true
+            }
             TargetPredicate(
-                isTarget = gameInfo.player.currentPosition == position || (commandToSafe.isNotEmpty() && gameInfo.player.currentPosition != position),
-                commandNeedPerformed = Command.BOMB.takeIf { gameInfo.player.currentPosition == position || (commandToSafe.isNotEmpty() && gameInfo.player.currentPosition != position) })
+                isTarget = (gameInfo.player.currentPosition == position && commandToSafe.isNotEmpty()) || (commandToSafe.isNotEmpty() && gameInfo.player.currentPosition != position),
+                commandNeedPerformed = Command.BOMB.takeIf { isTarget })
         }
     }
 }
