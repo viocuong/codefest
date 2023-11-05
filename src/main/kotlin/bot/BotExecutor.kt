@@ -3,8 +3,12 @@ package bot
 import bot.model.*
 import bot.strategys.*
 import io.socket.client.Socket
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import utils.JsonConverter
 import utils.JsonConverter.toJson
 import utils.onFLow
@@ -61,19 +65,30 @@ class BotExecutor {
         if (bombs.isEmpty()) {
             bombs.addAll(List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { 0 } })
         }
+        println("GAME TAG = ${gameInfo.tag}")
         when (gameInfo.tag) {
             GameTag.PLAYER_BACK_TO_PLAY -> {
+                if(gameInfo.isActionOfPlayer){
+                    startMove(gameInfo)
+                }
             }
 
             GameTag.START_GAME -> {
                 targetPosition = gameInfo.player.currentPosition
+                if(gameInfo.isActionOfPlayer){
+                    startMove(gameInfo)
+                }
             }
 
             GameTag.PLAYER_STOP_MOVING -> {
+                if(gameInfo.isActionOfPlayer){
+                    startMove(gameInfo)
+                }
             }
 
             GameTag.UPDATE_DATA -> {
             }
+
 
             GameTag.BOMB_EXPLOSED -> {
 //                val bombsExposed = currentBombs - gameInfo.mapInfo.bombs.toSet()
@@ -94,8 +109,10 @@ class BotExecutor {
 
             else -> {}
         }
-        lastTime = gameInfo.timestamp
-        startMove(gameInfo)
+        if(gameInfo.timestamp - lastTime >50) {
+            lastTime = gameInfo.timestamp
+            startMove(gameInfo)
+        }
     }
 
     private var lastTime = 0L
@@ -113,6 +130,7 @@ class BotExecutor {
                     gameInfo = gameInfo,
                     targetPredicate = AvoidBombStrategy(),
                     isNearBomb = true,
+                    noCheckTimeOfBomb = true
                 )
             val bestAndSafeCommand =
                 BotHandler.move(
@@ -132,16 +150,48 @@ class BotExecutor {
                     safeCommands.firstOrNull()
                 }
             println("Avoid BOMB direct" + safeCommands)
-            sendCommand(command, gameInfo)
+            sendCommand(safeCommands.firstOrNull(), gameInfo)
             return
         }
 
         // Move to an advantageous position
-        val dropBombDirections =
-            BotHandler.move(
-                gameInfo = gameInfo,
-                targetPredicate = DropBombStrategy(dropBombLastTime),
-            )
+        val (direction3, direction2, direction1) = withContext(Dispatchers.Default) {
+            val dropBombDirections3 =
+                async {
+                    BotHandler.move(
+                        gameInfo = gameInfo,
+                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 3),
+                    )
+                }
+            val dropBombDirections2 =
+                async {
+                    BotHandler.move(
+                        gameInfo = gameInfo,
+                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 2),
+                    )
+                }
+            val dropBombDirections1 =
+                async {
+                    BotHandler.move(
+                        gameInfo = gameInfo,
+                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 1),
+                    )
+                }
+            awaitAll(dropBombDirections3, dropBombDirections2, dropBombDirections1)
+        }
+        val dropBombDirections = when {
+            direction3.isNotEmpty() -> {
+                direction3
+            }
+
+            direction2.isNotEmpty() -> {
+                direction2
+            }
+
+            else -> {
+                direction1
+            }
+        }
         val getSpoilDirections =
             BotHandler.move(gameInfo = gameInfo, targetPredicate = GetSpoilsStrategy())
         println("DROP bomb = $dropBombDirections")

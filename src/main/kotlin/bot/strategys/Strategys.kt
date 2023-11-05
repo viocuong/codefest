@@ -1,6 +1,5 @@
 package bot.strategys
 
-import bot.BotExecutor.Companion.COMPLETE_EXPOSED_TIME
 import bot.BotHandler
 import bot.TargetPredicate
 import bot.model.*
@@ -37,12 +36,12 @@ class AvoidBombAndGetSpoil : StrategyMove {
     }
 }
 
-class DropBombStrategy(private val dropBombLastTime: Long) : StrategyMove {
+class DropBombStrategy(private val dropBombLastTime: Long,private val numberOfBalk: Int) : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
-        val isPositionNeedDropBomb = gameInfo.checkPositionIsNearBalk(
+        val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
             position = position
         )
-        if (!isPositionNeedDropBomb) return TargetPredicate()
+        if (numberOfBalkAttacked != numberOfBalk) return TargetPredicate()
         return if (gameInfo.timestamp - dropBombLastTime < gameInfo.player.delay) {
             println("START check to drop bomb not enough time = ${gameInfo.timestamp - dropBombLastTime < gameInfo.player.delay}")
             TargetPredicate()
@@ -54,15 +53,15 @@ class DropBombStrategy(private val dropBombLastTime: Long) : StrategyMove {
             )
             println("START check to drop bomb")
             val oldTimeStamp = gameInfo.bombs[position.row][position.col]
-            //gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
+            gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
             val commandToSafe = BotHandler.move(
                 gameInfo = gameInfo,
                 targetPredicate = AvoidBombStrategy(),
-                isNearBomb = false,
+                isNearBomb = true,
                 noCheckTimeOfBomb = true
             )
             println("START check to drop bomb result = $commandToSafe")
-            //gameInfo.bombs[position.row][position.col] = oldTimeStamp
+            gameInfo.bombs[position.row][position.col] = oldTimeStamp
             val isTarget = if (gameInfo.player.currentPosition == position) {
                 commandToSafe.isNotEmpty()
             } else {

@@ -1,9 +1,6 @@
 package bot.model
 
-import bot.BombManager
-import bot.BotExecutor
-import bot.dx
-import bot.dy
+import bot.*
 import com.squareup.moshi.FromJson
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -78,41 +75,71 @@ data class GameInfo(
 //        return false
     }
 
-    fun checkPositionIsNearBalk(position: Position): Boolean {
-        var numberOfBalkAttacked = 0
+    fun checkPositionIsNearBalk(position: Position): Int {
         val itemsBombNotAttackOver = listOf(ItemType.WALL)
-        var index = 1
-//        val length = lengthOfBomb
-//        var atLeft: Boolean? = null
-//        var atTop: Boolean? = null
-//        var atRight: Boolean? = null
-//        var atBottom: Boolean? = null
-//        for (i in 1 until length) {
-//            val left = position.col - i
-//            val right = position.col + i
-//            val top = position.row - i
-//            val bottom = position.row + i
-//            atLeft = atLeft != false && checkPositionIsItem(
-//                Position(row = position.row, col = left),
-//                item = ItemType.BALK
-//            )
-//            atRight = atRight != false &&
-//                    checkPositionIsItem(Position(row = position.row, col = right), item = ItemType.BALK)
-//            atTop = atTop != false && checkPositionIsItem(Position(col = position.col, row = top), item = ItemType.BALK)
-//            atBottom = atBottom != false && checkPositionIsItem(
-//                Position(col = position.col, row = bottom),
-//                item = ItemType.BALK
-//            )
-//        }
-//        return atLeft == true || atRight == true || atTop == true || atBottom == true
-        for (i in 0 until 4) {
-            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+        var index = 0
+        val numberOfBalkAttacked = 0
+        var balkLeft = 0
+        var balkUp = 0
+        var balkRight = 0
+        var balkDown = 0
+        while (index <= lengthOfBomb) {
+            for (i in dx.indices) {
+                val x = position.row + dx[i] * index
+                val y = position.col + dy[i] * index
+                if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    val nextPosition = Position(row = x, col = y)
+                    if (!checkPositionInbound(nextPosition)) continue
+                    val isNotAttack = getItem(nextPosition) in itemsBombNotAttackOver
+                    val isItemBalk = getItem(nextPosition) == ItemType.BALK
+                    when (BotHandler.getCommand(index)) {
+                        Command.LEFT -> {
+                            if (balkLeft != NO_ATTACK_BALK && isNotAttack) {
+                                balkLeft = NO_ATTACK_BALK
+                            } else if (isItemBalk) {
+                                balkLeft = 1
+                            }
+                        }
 
-            if (checkPositionInbound(nextPosition) && checkPositionIsItem(nextPosition, item = ItemType.BALK)) {
-                return true
+                        Command.UP -> {
+                            if (balkUp != NO_ATTACK_BALK && isNotAttack) {
+                                balkUp = NO_ATTACK_BALK
+                            } else if (isItemBalk) {
+                                balkUp = 1
+                            }
+                        }
+
+                        Command.RIGHT
+
+                        -> {
+                            if (balkRight != NO_ATTACK_BALK && isNotAttack) {
+                                balkRight = NO_ATTACK_BALK
+                            } else if (isItemBalk) {
+                                balkRight = 1
+                            }
+                        }
+
+                        else -> {
+                            if (balkDown != NO_ATTACK_BALK && isNotAttack) {
+                                balkDown = NO_ATTACK_BALK
+                            } else if (isItemBalk) {
+                                balkDown = 1
+                            }
+                        }
+                    }
+                }
             }
+            index++
         }
-        return false
+        return listOf(balkLeft, balkUp, balkRight, balkDown).filter { it != NO_ATTACK_BALK }.sum()
+//        for (i in 0 until 4) {
+//            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+//
+//            if (checkPositionInbound(nextPosition) && checkPositionIsItem(nextPosition, item = ItemType.BALK)) {
+//                return true
+//            }
+//        }
+//        return false
     }
 
     private fun checkPositionInbound(position: Position): Boolean {
@@ -126,6 +153,7 @@ data class GameInfo(
 
 
     fun checkPositionIsSafe(position: Position): Boolean {
+        if(!checkPositionIsInbound(position)) return false
         return !checkIsNearBomb(position, noCheckTime = true, avoidBomb = true)
     }
 
@@ -148,23 +176,10 @@ data class GameInfo(
                 val y = position.col + dy[i] * index
                 // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
-                    if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB> timestamp) {
-                        if(noCheckTime) return true
+                    if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
+                        if (noCheckTime) return true
                         bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
-//                        return true
-//                        val remain = bombs[x][y] + BotExecutor.COMPLETE_EXPOSED_TIME - timestamp
-//                        if (remain < 1500 + BotExecutor.COMPLETE_EXPOSED_TIME) {
-//                            return true
-//                        }
-//                        bombExposedEarliest =
-//                            minOf(bombExposedEarliest, bombs[x][y] + BotExecutor.COMPLETE_EXPOSED_TIME)
-//                        return true
                     }
-//                    val isBomb = bombs[x][y] > timestamp
-//                    if (bombs[x][y] > timestamp) return true
-//                    if (isBomb) {
-//                        bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
-//                    }
                 }
             }
             index++
@@ -172,7 +187,7 @@ data class GameInfo(
         // time = 12000, bomb = 14000
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
-        if(check){
+        if (check) {
             println(
                 """
             noCheckTime && bombExposedEarliest = ${noCheckTime && bombExposedEarliest > timestamp}
@@ -186,9 +201,6 @@ data class GameInfo(
         if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
         println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
         return bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp
-        // 104000
-        // 102000, 103000, 103900
-        return false
     }
 
     /**
@@ -208,6 +220,10 @@ data class GameInfo(
         }
     }
 
+    fun getItem(position: Position): ItemType {
+        return mapInfo.map[position.row][position.col]
+    }
+
     override fun toString(): String {
         return copy(mapInfo = mapInfo.copy(map = emptyList())).toJson().toString()
     }
@@ -215,8 +231,9 @@ data class GameInfo(
     companion object {
         private const val MAX_LENGTH_ATTACK = 5
         private const val MIN_LENGTH_ATTACK = 2
-        private const val BUFFER_TIME_END_OF_BOMB = 500L
+        private const val BUFFER_TIME_END_OF_BOMB = 600L
         private const val BOMB_EXPOSED_TIME = 2000L
+        private const val NO_ATTACK_BALK = -1
     }
 }
 

@@ -36,6 +36,7 @@ object BotHandler {
         // Stop when continue check next action
         while (moveQueue.isNotEmpty()) {
             val position = moveQueue.poll()
+            val forceMoveOverBomb = isNearBomb && !checkCanMoveSafe(position, gameInfo)
             for (i in dx.indices) {
                 val nextPosition = Position(
                     row = position.row + dx[i],
@@ -48,7 +49,7 @@ object BotHandler {
                         position = nextPosition,
                         competitorPosition = competitorPosition,
                         gameInfo = gameInfo,
-                        forceMoveOverBomb = isNearBomb || playerIsFreeze,
+                        forceMoveOverBomb = forceMoveOverBomb || playerIsFreeze,
                         noCheckTimeOfBomb = noCheckTimeOfBomb
                     )
                 ) {
@@ -141,7 +142,12 @@ object BotHandler {
         // TODO remove comment if can move over competitor.
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
         println("player = ${gameInfo.playerId}, checkNearBomb")
-        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(position, noCheckTimeOfBomb, check = true)) return false
+        if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(
+                position = position,
+                noCheckTime = noCheckTimeOfBomb,
+                check = true
+            )
+        ) return false
         println("player = ${gameInfo.playerId}, check is Mystic egg")
         if (forceMoveOverBomb && spoilItem?.spoilType == SpoilType.MYSTIC_DRAGON_EGG) return true
         println("player = ${gameInfo.playerId}, check is not move, item = $item")
@@ -154,7 +160,27 @@ object BotHandler {
         ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
     }
 
-    private fun getCommand(dxyIndex: Int): Command {
+    private fun checkCanMove(position: Position, gameInfo: GameInfo): Boolean {
+        val item = gameInfo.mapInfo.map[position.row][position.col]
+        val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
+        return !listOf(
+            ItemType.BALK,
+            ItemType.WALL,
+            ItemType.QUARANTINE_PLACE,
+            ItemType.TELEPORT_GATE,
+            ItemType.DRAGON_EGG_GST
+        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
+    }
+
+    private fun checkCanMoveSafe(position: Position, gameInfo: GameInfo): Boolean {
+        for (i in dx.indices) {
+            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+            if (gameInfo.checkPositionIsSafe(nextPosition) && checkCanMove(nextPosition, gameInfo)) return true
+        }
+        return false
+    }
+
+    fun getCommand(dxyIndex: Int): Command {
         return when (dxyIndex) {
             0 -> Command.LEFT
             1 -> Command.UP
