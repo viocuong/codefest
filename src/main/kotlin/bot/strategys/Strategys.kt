@@ -98,7 +98,7 @@ class AttackCompetitorEggStrategy(private val dropBombLastTime: Long) : Strategy
             position = position
         )
         if (!isPositionNeedAttack) return TargetPredicate()
-        return if (gameInfo.timestamp - dropBombLastTime < gameInfo.player.delay) {
+        return if (gameInfo.timestamp - dropBombLastTime <= gameInfo.player.delay) {
             TargetPredicate()
         } else {
             TargetPredicate(isTarget = true, commandNeedPerformed = Command.BOMB)

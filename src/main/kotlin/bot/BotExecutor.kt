@@ -3,17 +3,15 @@ package bot
 import bot.model.*
 import bot.strategys.*
 import io.socket.client.Socket
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import utils.JsonConverter
 import utils.JsonConverter.toJson
 import utils.onFLow
 import java.util.logging.Logger
+import kotlin.coroutines.suspendCoroutine
 
 enum class Event(val value: String) {
     JOIN_GAME("join game"),
@@ -25,7 +23,6 @@ class BotExecutor {
     private var botSocket: Socket? = null
     private var dropBombLastTime = 0L
     private val bombManager = BombManager()
-    private var allBomb = mutableListOf<Bomb>()
     private var bombs: MutableList<MutableList<Long>> = mutableListOf()
     private var playerId: String = ""
     suspend fun initGame(host: String, clientInfo: PlayerInfo) {
@@ -125,27 +122,31 @@ class BotExecutor {
     private var targetPosition: Position? = null
     private var isMoving: Boolean = false
 
-    private suspend fun startMove(gameInfo: GameInfo) {
+    private suspend fun startMove(gameInfo: GameInfo) = coroutineScope {
         // Check if player is dangerous, and move to safe zone.
         println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
         if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
             val timeOfBomb = gameInfo.bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col]
-            val safeCommands =
-                BotHandler.move(
-                    gameInfo = gameInfo,
-                    targetPredicate = AvoidBombStrategy(),
-                    isNearBomb = true,
-                    noCheckTimeOfBomb = true,
-                    timeOfCurrentBomb = timeOfBomb
-                )
-            val bestAndSafeCommand =
-                BotHandler.move(
-                    gameInfo = gameInfo,
-                    isNearBomb = true,
-                    noCheckTimeOfBomb = true,
-                    targetPredicate = AvoidBombCanMoveStrategy(),
-                    timeOfCurrentBomb = timeOfBomb,
-                )
+            val (safeCommands, bestAndSafeCommand) = awaitAll(
+                async(Dispatchers.Default) {
+                    BotHandler.move(
+                        gameInfo = gameInfo,
+                        targetPredicate = AvoidBombStrategy(),
+                        isNearBomb = true,
+                        noCheckTimeOfBomb = true,
+                        timeOfCurrentBomb = timeOfBomb
+                    )
+                },
+                async(Dispatchers.Default) {
+                    BotHandler.move(
+                        gameInfo = gameInfo,
+                        isNearBomb = true,
+                        noCheckTimeOfBomb = true,
+                        targetPredicate = AvoidBombCanMoveStrategy(),
+                        timeOfCurrentBomb = timeOfBomb,
+                    )
+                }
+            )
             println(
                 """
                 bestAndSafeCommand = $bestAndSafeCommand
@@ -157,47 +158,11 @@ class BotExecutor {
             }
             println("Avoid BOMB direct" + safeCommands)
             sendCommand(command.firstOrNull(), gameInfo)
-            return
+            return@coroutineScope
         }
 
-        // Move to an advantageous position
-        val (direction3, direction2, direction1) = withContext(Dispatchers.Default) {
-            val dropBombDirections3 =
-                async {
-                    BotHandler.move(
-                        gameInfo = gameInfo,
-                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 3),
-                    )
-                }
-            val dropBombDirections2 =
-                async {
-                    BotHandler.move(
-                        gameInfo = gameInfo,
-                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 2),
-                    )
-                }
-            val dropBombDirections1 =
-                async {
-                    BotHandler.move(
-                        gameInfo = gameInfo,
-                        targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 1),
-                    )
-                }
-            awaitAll(dropBombDirections3, dropBombDirections2, dropBombDirections1)
-        }
-        val dropBombDirections = when {
-            direction3.isNotEmpty() -> {
-                direction3
-            }
 
-            direction2.isNotEmpty() -> {
-                direction2
-            }
-
-            else -> {
-                direction1
-            }
-        }
+        val dropBombDirections = getDirectionsDropBomb(gameInfo)
         val getSpoilDirections =
             BotHandler.move(gameInfo = gameInfo, targetPredicate = GetSpoilsStrategy())
         println("DROP bomb = $dropBombDirections")
@@ -211,7 +176,7 @@ class BotExecutor {
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
             sendCommand(directionsAttach.firstOrNull(), gameInfo)
-            return
+            return@coroutineScope
         }
         val command =
             if (getSpoilDirections.isNotEmpty() && (dropBombDirections.isEmpty() || getSpoilDirections.size <= dropBombDirections.size)) {
@@ -222,6 +187,43 @@ class BotExecutor {
                 dropBombDirections.firstOrNull()
             }
         sendCommand(command, gameInfo)
+    }
+
+    private suspend fun getDirectionsDropBomb(gameInfo: GameInfo): List<Command> = coroutineScope {
+        val allDirections = awaitAll(
+            async {
+                BotHandler.move(
+                    gameInfo = gameInfo,
+                    targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 3),
+                )
+            },
+            async {
+                BotHandler.move(
+                    gameInfo = gameInfo,
+                    targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 2),
+                )
+            },
+            async {
+                BotHandler.move(
+                    gameInfo = gameInfo,
+                    targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 1),
+                )
+            }
+        )
+        val (direction3, direction2, direction1) = allDirections
+        when {
+            direction3.isNotEmpty() && direction3.size == allDirections.minOf { it.size } -> {
+                direction3
+            }
+
+            direction2.isNotEmpty() && direction2.size == allDirections.minOf { it.size } -> {
+                direction2
+            }
+
+            else -> {
+                direction1
+            }
+        }
     }
 
     private fun sendCommand(command: Command?, gameInfo: GameInfo) {

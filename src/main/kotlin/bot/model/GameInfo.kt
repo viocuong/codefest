@@ -168,8 +168,6 @@ data class GameInfo(
     ): Boolean {
         var index = 0
         var bombExposedEarliest = Long.MAX_VALUE
-        val timeBetweenMoves = 200L
-        var minIndex = Long.MAX_VALUE
         while (index <= lengthOfBomb) {
             for (i in dx.indices) {
                 val x = position.row + dx[i] * index
