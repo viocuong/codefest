@@ -18,6 +18,17 @@ class AvoidBombStrategy : StrategyMove {
     }
 }
 
+class AvoidBombCanMoveStrategy : StrategyMove {
+    override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+        val isSafePosition = gameInfo.checkPositionIsSafe(position)
+        println("Player is near bomb position = $position, isSafe $isSafePosition")
+        val isCanMove = gameInfo.checkCanMoveSafe(position)
+        return TargetPredicate(
+            isTarget = isSafePosition && isCanMove
+        )
+    }
+}
+
 class AvoidBombAndGetSpoil : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         println("AvoidBombAndGetSpoil player = ${gameInfo.playerId} position = $position")
@@ -36,7 +47,7 @@ class AvoidBombAndGetSpoil : StrategyMove {
     }
 }
 
-class DropBombStrategy(private val dropBombLastTime: Long,private val numberOfBalk: Int) : StrategyMove {
+class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfBalk: Int) : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
             position = position
@@ -60,11 +71,17 @@ class DropBombStrategy(private val dropBombLastTime: Long,private val numberOfBa
                 isNearBomb = false,
                 noCheckTimeOfBomb = true,
             )
+            val commandToBestSafe = BotHandler.move(
+                gameInfo = gameInfo,
+                targetPredicate = AvoidBombCanMoveStrategy(),
+                isNearBomb = false,
+                noCheckTimeOfBomb = true
+            )
             val canMove = gameInfo.checkCanMoveSafe(position)
             println("START check to drop bomb result = $commandToSafe")
 //            gameInfo.bombs[position.row][position.col] = oldTimeStamp
             val isTarget = if (gameInfo.player.currentPosition == position) {
-                commandToSafe.isNotEmpty()
+                commandToSafe.isNotEmpty() || commandToBestSafe.isNotEmpty()
             } else {
                 true
             }

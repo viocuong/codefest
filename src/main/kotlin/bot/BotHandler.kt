@@ -143,6 +143,7 @@ object BotHandler {
     ): Boolean {
         println("player = ${gameInfo.playerId}, forceMoveOverBombs = $forceMoveOverBomb, position = $position")
         if (!gameInfo.checkPositionIsInbound(position)) return false
+        if (gameInfo.mapInfo.bombs.any { it.row == position.row && it.col == position.col }) return false
         val item = gameInfo.mapInfo.map[position.row][position.col]
         val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
         // TODO remove comment if can move over competitor.
@@ -154,7 +155,7 @@ object BotHandler {
             )
         ) return false
         println("player = ${gameInfo.playerId}, check is Mystic egg")
-        if (forceMoveOverBomb && spoilItem?.spoilType == SpoilType.MYSTIC_DRAGON_EGG) return true
+        if (forceMoveOverBomb && spoilItem?.spoilType in notShouldMoveSpoils) return true
         println("player = ${gameInfo.playerId}, check is not move, item = $item")
         return !listOf(
             ItemType.BALK,
@@ -162,7 +163,7 @@ object BotHandler {
             ItemType.QUARANTINE_PLACE,
             ItemType.TELEPORT_GATE,
             ItemType.DRAGON_EGG_GST
-        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
+        ).contains(item) && spoilItem?.spoilType !in notShouldMoveSpoils
     }
 
     private fun checkCanMove(position: Position, gameInfo: GameInfo): Boolean {
@@ -174,7 +175,7 @@ object BotHandler {
             ItemType.QUARANTINE_PLACE,
             ItemType.TELEPORT_GATE,
             ItemType.DRAGON_EGG_GST
-        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
+        ).contains(item) && spoilItem?.spoilType !in notShouldMoveSpoils
     }
 
     private fun checkCanMoveSafe(position: Position, gameInfo: GameInfo): Boolean {
@@ -193,4 +194,6 @@ object BotHandler {
             else -> Command.DOWN
         }
     }
+
+    private val notShouldMoveSpoils = listOf<SpoilType>()
 }

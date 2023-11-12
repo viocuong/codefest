@@ -9,9 +9,11 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import utils.JsonConverter
 import utils.JsonConverter.toJson
 import utils.onFLow
+import java.util.logging.Logger
 
 enum class Event(val value: String) {
     JOIN_GAME("join game"),
@@ -25,17 +27,20 @@ class BotExecutor {
     private val bombManager = BombManager()
     private var allBomb = mutableListOf<Bomb>()
     private var bombs: MutableList<MutableList<Long>> = mutableListOf()
-    suspend fun initGame(host: String, playerInfo: PlayerInfo) {
+    private var playerId: String = ""
+    suspend fun initGame(host: String, clientInfo: PlayerInfo) {
         BotSocket.initSocket(host = host) {
             botSocket = this
             on(Event.JOIN_GAME.value) { args ->
-                val data = args[0]
+                val gameInfo = JsonConverter.fromJson<PlayerInfo>(args[0] as JSONObject)
+                if (clientInfo.playerId.contains(gameInfo?.playerId ?: "")) {
+                    playerId = gameInfo?.playerId ?: ""
+                }
 //                println("Join game $data")
             }
             on(Socket.EVENT_CONNECT) {
                 emit(
-                    Event.JOIN_GAME.value,
-                    playerInfo.toJson()
+                    Event.JOIN_GAME.value, clientInfo.toJson()
                 )
             }
         }
@@ -53,7 +58,7 @@ class BotExecutor {
             ?.collect { gameInfo ->
                 onReceiveGame(
                     gameInfo.copy(
-                        playerId = playerInfo.playerId,
+                        playerId = playerId,
                         bombManager = bombManager,
                         bombs = bombs
                     )
@@ -68,20 +73,20 @@ class BotExecutor {
         println("GAME TAG = ${gameInfo.tag}")
         when (gameInfo.tag) {
             GameTag.PLAYER_BACK_TO_PLAY -> {
-                if(gameInfo.isActionOfPlayer){
+                if (gameInfo.isActionOfPlayer) {
                     startMove(gameInfo)
                 }
             }
 
             GameTag.START_GAME -> {
                 targetPosition = gameInfo.player.currentPosition
-                if(gameInfo.isActionOfPlayer){
+                if (gameInfo.isActionOfPlayer) {
                     startMove(gameInfo)
                 }
             }
 
             GameTag.PLAYER_STOP_MOVING -> {
-                if(gameInfo.isActionOfPlayer){
+                if (gameInfo.isActionOfPlayer) {
                     startMove(gameInfo)
                 }
             }
@@ -109,7 +114,7 @@ class BotExecutor {
 
             else -> {}
         }
-        if(gameInfo.timestamp - lastTime >50) {
+        if (gameInfo.timestamp - lastTime > 50) {
             lastTime = gameInfo.timestamp
             startMove(gameInfo)
         }
@@ -136,7 +141,9 @@ class BotExecutor {
             val bestAndSafeCommand =
                 BotHandler.move(
                     gameInfo = gameInfo,
-                    targetPredicate = AvoidBombAndGetSpoil(),
+                    isNearBomb = true,
+                    noCheckTimeOfBomb = true,
+                    targetPredicate = AvoidBombCanMoveStrategy(),
                     timeOfCurrentBomb = timeOfBomb,
                 )
             println(
@@ -145,14 +152,11 @@ class BotExecutor {
                 safeCommands = $safeCommands
             """.trimIndent()
             )
-            val command =
-                if (bestAndSafeCommand.isNotEmpty() && (safeCommands.isEmpty() || bestAndSafeCommand.size < safeCommands.size)) {
-                    bestAndSafeCommand.firstOrNull()
-                } else {
-                    safeCommands.firstOrNull()
-                }
+            val command = bestAndSafeCommand.ifEmpty {
+                safeCommands
+            }
             println("Avoid BOMB direct" + safeCommands)
-            sendCommand(safeCommands.firstOrNull(), gameInfo)
+            sendCommand(command.firstOrNull(), gameInfo)
             return
         }
 
@@ -232,5 +236,7 @@ class BotExecutor {
 
     companion object {
         const val COMPLETE_EXPOSED_TIME = 700L
+        val log = Logger.getLogger(BotExecutor::class.java.name)
+        private const val CONTINUE_MOVE_CNT = 3
     }
 }
