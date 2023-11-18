@@ -43,7 +43,7 @@ class BotExecutor {
         }
         botSocket?.onFLow(Event.TICK_TACK.value)
             ?.map { json ->
-                println(json)
+//                println(json)
                 JsonConverter.fromJson<GameInfo>(
                     json,
                     GameTagAdapter(),
@@ -67,7 +67,7 @@ class BotExecutor {
         if (bombs.isEmpty()) {
             bombs.addAll(List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { 0 } })
         }
-        println("GAME TAG = ${gameInfo.tag}")
+        log.info("GAME TAG = ${gameInfo.tag}")
         when (gameInfo.tag) {
             GameTag.PLAYER_BACK_TO_PLAY -> {
                 if (gameInfo.isActionOfPlayer) {
@@ -106,7 +106,7 @@ class BotExecutor {
                     val exposedEndTime = bomb.remainTime + gameInfo.timestamp
                     bombs[bomb.row][bomb.col] = maxOf(bombs[bomb.row][bomb.col], exposedEndTime)
                 }
-                println("BOM SETUP")
+//                println("BOM SETUP")
             }
 
             else -> {}
@@ -124,12 +124,21 @@ class BotExecutor {
 
     private suspend fun startMove(gameInfo: GameInfo) = coroutineScope {
         // Check if player is dangerous, and move to safe zone.
-        println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
+//        println("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
         if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
             val timeOfBomb = gameInfo.bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col]
+            log.warning(
+                """
+                ---------------------------------------------------
+                Start move safe zone
+                timeStamp = ${gameInfo.timestamp}
+                timeOfbom = ${timeOfBomb}
+            """.trimIndent()
+            )
             val (safeCommands, bestAndSafeCommand) = awaitAll(
                 async(Dispatchers.Default) {
                     BotHandler.move(
+                        position = gameInfo.player.currentPosition,
                         gameInfo = gameInfo,
                         targetPredicate = AvoidBombStrategy(),
                         isNearBomb = true,
@@ -139,6 +148,7 @@ class BotExecutor {
                 },
                 async(Dispatchers.Default) {
                     BotHandler.move(
+                        position = gameInfo.player.currentPosition,
                         gameInfo = gameInfo,
                         isNearBomb = true,
                         noCheckTimeOfBomb = true,
@@ -147,16 +157,16 @@ class BotExecutor {
                     )
                 }
             )
-            println(
-                """
-                bestAndSafeCommand = $bestAndSafeCommand
-                safeCommands = $safeCommands
-            """.trimIndent()
-            )
+//            println(
+//                """
+//                bestAndSafeCommand = $bestAndSafeCommand
+//                safeCommands = $safeCommands
+//            """.trimIndent()
+//            )
             val command = bestAndSafeCommand.ifEmpty {
                 safeCommands
             }
-            println("Avoid BOMB direct" + safeCommands)
+//            println("Avoid BOMB direct" + safeCommands)
             sendCommand(command.firstOrNull(), gameInfo)
             return@coroutineScope
         }
@@ -164,14 +174,19 @@ class BotExecutor {
 
         val dropBombDirections = getDirectionsDropBomb(gameInfo)
         val getSpoilDirections =
-            BotHandler.move(gameInfo = gameInfo, targetPredicate = GetSpoilsStrategy())
-        println("DROP bomb = $dropBombDirections")
-        println("GET spoil = $getSpoilDirections")
+            BotHandler.move(
+                position = gameInfo.player.currentPosition,
+                gameInfo = gameInfo,
+                targetPredicate = GetSpoilsStrategy()
+            )
+//        println("DROP bomb = $dropBombDirections")
+//        println("GET spoil = $getSpoilDirections")
         // If can't get spoil and drop bomb, perform attack competitor egg.
         if (dropBombDirections.isEmpty() && getSpoilDirections.isEmpty()) {
-            println("Attack competitor egg")
+//            println("Attack competitor egg")
             val directionsAttach =
                 BotHandler.move(
+                    position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
@@ -180,10 +195,10 @@ class BotExecutor {
         }
         val command =
             if (getSpoilDirections.isNotEmpty() && (dropBombDirections.isEmpty() || getSpoilDirections.size <= dropBombDirections.size)) {
-                println("GET SPOIL = $getSpoilDirections")
+//                println("GET SPOIL = $getSpoilDirections")
                 getSpoilDirections.firstOrNull()
             } else {
-                println("DROP BOMB = $dropBombDirections")
+//                println("DROP BOMB = $dropBombDirections")
                 dropBombDirections.firstOrNull()
             }
         sendCommand(command, gameInfo)
@@ -193,18 +208,21 @@ class BotExecutor {
         val allDirections = awaitAll(
             async {
                 BotHandler.move(
+                    position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 3),
                 )
             },
             async {
                 BotHandler.move(
+                    position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 2),
                 )
             },
             async {
                 BotHandler.move(
+                    position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 1),
                 )
@@ -228,7 +246,7 @@ class BotExecutor {
 
     private fun sendCommand(command: Command?, gameInfo: GameInfo) {
         isMoving = false
-        println("COMMAND = $command")
+        log.warning("COMMAND = $command")
 //        if (command == Command.BOMB) {
 //            bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col] = gameInfo.timestamp + 2200
 //        }

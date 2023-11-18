@@ -14,7 +14,7 @@ class BombManager {
         bombs.filter { it.remainTime == 0 }
         bombsTime.removeIf { it.endExposedTime < currentTime }
         // Remove bomb completely exposed.
-        println("BombManager#updateBombs $bombsTime")
+//        println("BombManager#updateBombs $bombsTime")
     }
     companion object {
 

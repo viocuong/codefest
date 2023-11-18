@@ -3,7 +3,9 @@ package bot
 import bot.model.*
 import bot.strategys.StrategyMove
 import java.util.*
+import java.util.logging.Logger
 import kotlin.collections.HashMap
+import kotlin.math.abs
 
 val dx = listOf(0, -1, 0, 1)
 val dy = listOf(-1, 0, 1, 0)
@@ -16,22 +18,23 @@ object BotHandler {
 //    abstract fun attack(command: List<Command>)
 
     fun move(
+        position: Position,
         gameInfo: GameInfo,
         targetPredicate: StrategyMove,
         isNearBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
         timeOfCurrentBomb: Long = 0,
     ): List<Command> {
-        val playerPosition = gameInfo.player.currentPosition
-        val beginTargetPredicate = targetPredicate.predicate(playerPosition, gameInfo)
+//        val playerPosition = gameInfo.player.currentPosition
+        val beginTargetPredicate = targetPredicate.predicate(position, gameInfo)
         if (beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(Command.BOMB)
         val competitorPosition = gameInfo.competitor.currentPosition
         val visits: List<MutableList<Boolean>> =
             List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { false } }
         val moveQueue: Queue<Position> = LinkedList()
         val paths: HashMap<Position?, Position?> = hashMapOf()
-        visits[playerPosition.row][playerPosition.col] = true
-        moveQueue.add(playerPosition)
+        visits[position.row][position.col] = true
+        moveQueue.add(position)
         val playerIsFreeze = checkPlayerFreezeMove(gameInfo)
         println("Freeze = $playerIsFreeze, currentPosition = ${gameInfo.player.currentPosition}")
         // Stop when continue check next action
@@ -45,10 +48,8 @@ object BotHandler {
                     col = position.col + dy[i],
                     command = getCommand(i)
                 )
-                val moveOverBomb = forceMoveOverBomb && gameInfo.checkIsNearBomb(
-                    position = nextPosition,
-                    timeOfCurrentBomb = timeOfCurrentBomb
-                )
+                val positionIsBombOfPlayer = checkPositionIsNearBomb(gameInfo, nextPosition, position)
+                val moveOverBomb = forceMoveOverBomb && gameInfo.checkForceMoveOverBomb(position, timeOfCurrentBomb)
                 if (gameInfo.checkPositionIsInbound(nextPosition) &&
                     !visits[nextPosition.row][nextPosition.col] &&
                     checkCanMove(
@@ -141,22 +142,22 @@ object BotHandler {
         forceMoveOverBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
     ): Boolean {
-        println("player = ${gameInfo.playerId}, forceMoveOverBombs = $forceMoveOverBomb, position = $position")
+//        println("player = ${gameInfo.playerId}, forceMoveOverBombs = $forceMoveOverBomb, position = $position")
         if (!gameInfo.checkPositionIsInbound(position)) return false
         if (gameInfo.mapInfo.bombs.any { it.row == position.row && it.col == position.col }) return false
         val item = gameInfo.mapInfo.map[position.row][position.col]
         val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
         // TODO remove comment if can move over competitor.
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
-        println("player = ${gameInfo.playerId}, checkNearBomb")
+//        println("player = ${gameInfo.playerId}, checkNearBomb")
         if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(
                 position = position,
                 noCheckTime = noCheckTimeOfBomb,
             )
         ) return false
-        println("player = ${gameInfo.playerId}, check is Mystic egg")
+//        println("player = ${gameInfo.playerId}, check is Mystic egg")
         if (forceMoveOverBomb && spoilItem?.spoilType in notShouldMoveSpoils) return true
-        println("player = ${gameInfo.playerId}, check is not move, item = $item")
+//        println("player = ${gameInfo.playerId}, check is not move, item = $item")
         return !listOf(
             ItemType.BALK,
             ItemType.WALL,
@@ -185,6 +186,10 @@ object BotHandler {
         }
         return false
     }
+    private fun checkPositionIsNearBomb(gameInfo: GameInfo, position: Position, bombPosition: Position): Boolean {
+        if (position.row == bombPosition.row && abs(position.col - bombPosition.col) <= gameInfo.lengthOfBomb) return true
+        return position.col == bombPosition.col && abs(position.row - bombPosition.row) <= gameInfo.lengthOfBomb
+    }
 
     fun getCommand(dxyIndex: Int): Command {
         return when (dxyIndex) {
@@ -194,6 +199,6 @@ object BotHandler {
             else -> Command.DOWN
         }
     }
-
+    private val log = Logger.getLogger(BotExecutor::class.java.name)
     private val notShouldMoveSpoils = listOf<SpoilType>()
 }

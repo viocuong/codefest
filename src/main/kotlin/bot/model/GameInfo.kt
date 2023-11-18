@@ -5,6 +5,7 @@ import com.squareup.moshi.FromJson
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import utils.JsonConverter.toJson
+import java.util.logging.Logger
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -149,12 +150,39 @@ data class GameInfo(
     private fun checkPositionIsItem(position: Position, item: ItemType): Boolean =
         mapInfo.map.getOrNull(position.row)?.getOrNull(position.col) == item
 
-    private val lengthOfBomb: Int get() = (player.power).coerceAtLeast(1)
+    val lengthOfBomb: Int get() = (player.power).coerceAtLeast(1)
 
 
     fun checkPositionIsSafe(position: Position): Boolean {
         if (!checkPositionIsInbound(position)) return false
-        return !checkIsNearBomb(position, noCheckTime = true, avoidBomb = true)
+        return !checkIsNearBomb(position, noCheckTime = true)
+    }
+
+    fun checkForceMoveOverBomb(
+        position: Position,
+        timeOfCurrentBomb: Long = 0, // Time of bomb, that place at player.
+    ): Boolean {
+        var index = 0
+        var bombExposedEarliest = Long.MAX_VALUE
+        while (index <= lengthOfBomb) {
+            for (i in dx.indices) {
+                val x = position.row + dx[i] * index
+                val y = position.col + dy[i] * index
+                // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
+                if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
+                        bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
+                    }
+                }
+            }
+            index++
+        }
+        if (bombExposedEarliest == Long.MAX_VALUE) return false
+        if(timeOfCurrentBomb>0 ){
+            log.warning("Position=$position")
+            log.warning("Earliest = $bombExposedEarliest | current = $timeOfCurrentBomb, distance = ${timeOfCurrentBomb - bombExposedEarliest}")
+        }
+        return timeOfCurrentBomb == bombExposedEarliest
     }
 
     /**
@@ -163,7 +191,7 @@ data class GameInfo(
     fun checkIsNearBomb(
         position: Position,
         noCheckTime: Boolean = false,
-        timeOfCurrentBomb: Long = 0,
+        timeOfCurrentBomb: Long = 0, // If this value > 0 => check force move over bomb
         avoidBomb: Boolean = false,
     ): Boolean {
         var index = 0
@@ -186,10 +214,10 @@ data class GameInfo(
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
         if(timeOfCurrentBomb <= bombExposedEarliest) return true
-        println("Remain time nocheck")
-        println("Avoid && bomb")
+//        println("Remain time nocheck")
+//        println("Avoid && bomb")
 //        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
-        println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
+//        println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
         return bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp
     }
 
@@ -244,6 +272,7 @@ data class GameInfo(
         private const val BUFFER_TIME_END_OF_BOMB = 600L
         private const val BOMB_EXPOSED_TIME = 2000L
         private const val NO_ATTACK_BALK = -1
+        private val log = Logger.getLogger(BotExecutor::class.java.name)
     }
 }
 
