@@ -111,10 +111,10 @@ class BotExecutor {
 
             else -> {}
         }
-        if (gameInfo.timestamp - lastTime > 50) {
+//        if (gameInfo.timestamp - lastTime > 50) {
             lastTime = gameInfo.timestamp
             startMove(gameInfo)
-        }
+//        }
     }
 
     private var lastTime = 0L
