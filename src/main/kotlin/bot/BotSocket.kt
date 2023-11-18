@@ -14,7 +14,7 @@ object BotSocket {
             connect()
         }
         socket?.on(Socket.EVENT_CONNECT_ERROR) {
-            println("connect error ${it[0]}")
+            //ln("connect error ${it[0]}")
         }
         socket?.socketHandler()
     }

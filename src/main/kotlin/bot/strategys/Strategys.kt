@@ -12,7 +12,7 @@ interface StrategyMove {
 class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
-        println("Player is near bomb position = $position, isSafe $isSafePosition")
+        //ln("Player is near bomb position = $position, isSafe $isSafePosition")
         val isTarget = !checkPositionIsNearBomb(gameInfo, position = position, bombPosition = bombPosition) && isSafePosition
         return TargetPredicate(
             isTarget = isTarget
@@ -28,7 +28,7 @@ class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : St
 class AvoidBombCanMoveStrategy : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
-        println("Player is near bomb position = $position, isSafe $isSafePosition")
+        //ln("Player is near bomb position = $position, isSafe $isSafePosition")
         val isCanMove = gameInfo.checkCanMoveSafe(position)
         return TargetPredicate(
             isTarget = isSafePosition && isCanMove
@@ -38,7 +38,7 @@ class AvoidBombCanMoveStrategy : StrategyMove {
 
 class AvoidBombAndGetSpoil : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
-        println("AvoidBombAndGetSpoil player = ${gameInfo.playerId} position = $position")
+        //ln("AvoidBombAndGetSpoil player = ${gameInfo.playerId} position = $position")
         val isSafePosition = gameInfo.checkPositionIsSafe(position) && gameInfo.checkSpoilNeedGet(
             position,
             spoilsNeedGet = listOf(
@@ -47,7 +47,7 @@ class AvoidBombAndGetSpoil : StrategyMove {
                 SpoilType.DELAY_TIME_DRAGON_EGG
             )
         )
-        println("Player is near bomb, isSafe $isSafePosition")
+        //ln("Player is near bomb, isSafe $isSafePosition")
         return TargetPredicate(
             isTarget = isSafePosition
         )
@@ -67,7 +67,7 @@ class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfB
                 Bomb(col = position.col, row = position.row, remainTime = 2000, playerId = gameInfo.playerId ?: "")
             }
         )
-        println("START check to drop bomb")
+        //ln("START check to drop bomb")
         val oldTimeStamp = gameInfo.bombs[position.row][position.col]
 //            gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
         val commandToSafe = BotHandler.move(
@@ -84,7 +84,7 @@ class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfB
 //            noCheckTimeOfBomb = true
 //        )
         val canMove = gameInfo.checkCanMoveSafe(position)
-        println("START check to drop bomb result = $commandToSafe")
+        //ln("START check to drop bomb result = $commandToSafe")
 //            gameInfo.bombs[position.row][position.col] = oldTimeStamp
         val isTarget =
             commandToSafe.isNotEmpty()
@@ -118,7 +118,7 @@ class AttackCompetitorEggStrategy(private val dropBombLastTime: Long) : Strategy
 
 class GetSpoilsStrategy : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
-        println("GEt GetSpoilsStrategy")
+        //ln("GEt GetSpoilsStrategy")
         val isPositionHaveSpoilNeedGet = gameInfo.checkSpoilNeedGet(
             position,
             spoilsNeedGet = listOf(

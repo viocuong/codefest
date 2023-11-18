@@ -7,7 +7,7 @@ import java.util.*
 
 fun main(args: Array<String>): Unit = runBlocking {
 //    val map = mapOf(Student("A") to 1, Student("B") to 2, Student("A") to 3)
-//    println(map.size)
+//    //ln(map.size)
 //    launch {
 //        val botExecutor = BotExecutor()
 //        botExecutor.initGame(
@@ -20,7 +20,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         val botExecutor = BotExecutor()
         botExecutor.initGame(
             host = "http://localhost",
-            clientInfo = PlayerInfo(gameId = "359a943e-c5fe-4331-a58c-ed1070275bfe", playerId = "player2-xxx"),
+            clientInfo = PlayerInfo(gameId = "901de666-3a8e-4a04-a436-25cfe94d33a3", playerId = "player2-xxx"),
         )
     }
 }

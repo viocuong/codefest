@@ -34,11 +34,11 @@ data class GameInfo(
 
     fun checkPositionIsNearCompetitorEgg(position: Position): Boolean {
         if (playerId == "player2-xxx") {
-            println("checkPositionIsNearCompetitorEgg $position")
+            //ln("checkPositionIsNearCompetitorEgg $position")
         }
         val competitorEgg = mapInfo.dragonEggGSTArray.firstOrNull { it.id != playerId } ?: return false
         if (playerId == "player2-xxx") {
-            println("checkPositionIsNearCompetitorEgg egg =  $competitorEgg, lengBomb = $lengthOfBomb")
+            //ln("checkPositionIsNearCompetitorEgg egg =  $competitorEgg, lengBomb = $lengthOfBomb")
         }
         val canVerticalAttack =
             (position.col == competitorEgg.col && abs(position.row - competitorEgg.row) <= lengthOfBomb)
@@ -214,10 +214,10 @@ data class GameInfo(
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
         if(timeOfCurrentBomb <= bombExposedEarliest) return true
-//        println("Remain time nocheck")
-//        println("Avoid && bomb")
+//        //ln("Remain time nocheck")
+//        //ln("Avoid && bomb")
 //        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
-//        println("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
+//        //ln("bombExposedEarliest + BUFFER_TIME_END_OF_BOMB")
         return bombExposedEarliest + BUFFER_TIME_END_OF_BOMB > timestamp
     }
 
