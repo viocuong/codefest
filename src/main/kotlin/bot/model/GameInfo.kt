@@ -163,6 +163,33 @@ data class GameInfo(
         timeOfCurrentBomb: Long = 0, // Time of bomb, that place at player.
     ): Boolean {
         var index = 0
+        var bombExposedEarliest = Long.MIN_VALUE
+        val otherBombs = mutableSetOf<Long>()
+        while (index <= lengthOfBomb) {
+            for (i in dx.indices) {
+                val x = position.row + dx[i] * index
+                val y = position.col + dy[i] * index
+                // 1: timestamp = 102000, bomb dropped 102000, endTime = 104000
+                if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
+                        bombExposedEarliest = maxOf(bombExposedEarliest, bombs[x][y])
+                        otherBombs.add(bombs[x][y])
+                    }
+                }
+            }
+            index++
+        }
+        if (bombExposedEarliest == Long.MIN_VALUE) return false
+        if (timeOfCurrentBomb > 0) {
+            log.warning("Position=$position")
+            log.warning("Earliest = $bombExposedEarliest | current = $timeOfCurrentBomb, distance = ${timeOfCurrentBomb - bombExposedEarliest}")
+            log.warning("other bomb = ${otherBombs}")
+        }
+        return timeOfCurrentBomb == bombExposedEarliest && otherBombs.size == 1
+    }
+
+    fun getTimeOfBomb(position: Position): Long {
+        var index = 0
         var bombExposedEarliest = Long.MAX_VALUE
         while (index <= lengthOfBomb) {
             for (i in dx.indices) {
@@ -172,17 +199,17 @@ data class GameInfo(
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
                     if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
                         bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
+                        if(index == 0) return bombExposedEarliest
                     }
                 }
             }
             index++
         }
-        if (bombExposedEarliest == Long.MAX_VALUE) return false
-        if(timeOfCurrentBomb>0 ){
-            log.warning("Position=$position")
-            log.warning("Earliest = $bombExposedEarliest | current = $timeOfCurrentBomb, distance = ${timeOfCurrentBomb - bombExposedEarliest}")
+        return if (bombExposedEarliest == Long.MAX_VALUE) {
+            0
+        } else {
+            bombExposedEarliest
         }
-        return timeOfCurrentBomb == bombExposedEarliest
     }
 
     /**
@@ -213,7 +240,7 @@ data class GameInfo(
         // time = 12000, bomb = 14000
         // time = 13000, bomb = 14000
         if (bombExposedEarliest == Long.MAX_VALUE) return false
-        if(timeOfCurrentBomb <= bombExposedEarliest) return true
+        if (timeOfCurrentBomb <= bombExposedEarliest) return true
 //        //ln("Remain time nocheck")
 //        //ln("Avoid && bomb")
 //        if (avoidBomb && bombExposedEarliest - timestamp > 1000) return false
@@ -269,7 +296,7 @@ data class GameInfo(
     companion object {
         private const val MAX_LENGTH_ATTACK = 5
         private const val MIN_LENGTH_ATTACK = 2
-        private const val BUFFER_TIME_END_OF_BOMB = 600L
+        private const val BUFFER_TIME_END_OF_BOMB = 800L
         private const val BOMB_EXPOSED_TIME = 2000L
         private const val NO_ATTACK_BALK = -1
         private val log = Logger.getLogger(BotExecutor::class.java.name)

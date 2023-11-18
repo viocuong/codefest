@@ -62,11 +62,6 @@ class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfB
         if (numberOfBalkAttacked != numberOfBalk) return TargetPredicate()
         val canDropBomb = gameInfo.timestamp - dropBombLastTime >= gameInfo.player.delay
         if(!canDropBomb) return TargetPredicate()
-        val mapInfoHaveBomb = gameInfo.mapInfo.copy(
-            bombs = gameInfo.mapInfo.bombs.toMutableList().apply {
-                Bomb(col = position.col, row = position.row, remainTime = 2000, playerId = gameInfo.playerId ?: "")
-            }
-        )
         //ln("START check to drop bomb")
         val oldTimeStamp = gameInfo.bombs[position.row][position.col]
 //            gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000

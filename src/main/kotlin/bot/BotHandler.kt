@@ -53,6 +53,8 @@ object BotHandler {
                     position,
                     timeOfCurrentBomb
                 )
+                log.warning("moveOverBom=$moveOverBomb")
+                if(isNearBomb && !moveOverBomb) continue
                 if (gameInfo.checkPositionIsInbound(nextPosition) &&
                     !visits[nextPosition.row][nextPosition.col] &&
                     checkCanMove(

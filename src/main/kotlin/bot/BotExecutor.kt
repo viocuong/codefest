@@ -126,7 +126,7 @@ class BotExecutor {
         // Check if player is dangerous, and move to safe zone.
 //        //ln("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
         if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
-            val timeOfBomb = gameInfo.bombs[gameInfo.player.currentPosition.row][gameInfo.player.currentPosition.col]
+            val timeOfBomb = gameInfo.getTimeOfBomb(gameInfo.player.currentPosition)
             log.warning(
                 """
                 ---------------------------------------------------
