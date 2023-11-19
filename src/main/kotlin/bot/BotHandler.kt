@@ -24,10 +24,11 @@ object BotHandler {
         isNearBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
         timeOfCurrentBomb: Long = 0,
+        notDropBombWhenStart: Boolean = false,
     ): List<Command> {
 //        val playerPosition = gameInfo.player.currentPosition
         val beginTargetPredicate = targetPredicate.predicate(position, gameInfo)
-        if (beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(Command.BOMB)
+        if (!notDropBombWhenStart && beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(Command.BOMB)
         val competitorPosition = gameInfo.competitor.currentPosition
         val visits: List<MutableList<Boolean>> =
             List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { false } }
@@ -53,8 +54,8 @@ object BotHandler {
                     position,
                     timeOfCurrentBomb
                 )
-                log.warning("moveOverBom=$moveOverBomb")
-                if(isNearBomb && !moveOverBomb) continue
+//                log.warning("moveOverBom=$moveOverBomb")
+                if (isNearBomb && !moveOverBomb) continue
                 if (gameInfo.checkPositionIsInbound(nextPosition) &&
                     !visits[nextPosition.row][nextPosition.col] &&
                     checkCanMove(

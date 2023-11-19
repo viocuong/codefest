@@ -13,7 +13,8 @@ class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : St
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
         //ln("Player is near bomb position = $position, isSafe $isSafePosition")
-        val isTarget = !checkPositionIsNearBomb(gameInfo, position = position, bombPosition = bombPosition) && isSafePosition
+        val isTarget =
+            !checkPositionIsNearBomb(gameInfo, position = position, bombPosition = bombPosition) && isSafePosition
         return TargetPredicate(
             isTarget = isTarget
         )
@@ -54,17 +55,46 @@ class AvoidBombAndGetSpoil : StrategyMove {
     }
 }
 
-class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfBalk: Int) : StrategyMove {
+/**
+ * Check and return Bomb command if can drop bomb
+ */
+private fun getBombCommand(position: Position, gameInfo: GameInfo, dropBombLastTime: Long): Command? {
+    val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
+        position = position
+    )
+    val canDropBomb = gameInfo.timestamp - dropBombLastTime >= gameInfo.player.delay
+    if (!canDropBomb) return null
+    //ln("START check to drop bomb")
+    val oldTimeStamp = gameInfo.bombs[position.row][position.col]
+    if (numberOfBalkAttacked == 0) return null
+//          numberOfBalkAttacked  gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
+    val commandToSafe = BotHandler.move(
+        position = position,
+        gameInfo = gameInfo,
+        targetPredicate = AvoidBombStrategy(position),
+        isNearBomb = false,
+        noCheckTimeOfBomb = true,
+    )
+    val canMove = gameInfo.checkCanMoveSafe(position)
+    val isTarget =
+        commandToSafe.isNotEmpty()
+
+    return Command.BOMB.takeIf { isTarget && canMove }
+}
+
+class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfBalk: Int = DROP_ANY_BALK) :
+    StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
             position = position
         )
-        if (numberOfBalkAttacked != numberOfBalk) return TargetPredicate()
         val canDropBomb = gameInfo.timestamp - dropBombLastTime >= gameInfo.player.delay
-        if(!canDropBomb) return TargetPredicate()
+        if (!canDropBomb) return TargetPredicate()
         //ln("START check to drop bomb")
         val oldTimeStamp = gameInfo.bombs[position.row][position.col]
-//            gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
+        if (numberOfBalk != DROP_ANY_BALK && numberOfBalkAttacked != numberOfBalk) return TargetPredicate()
+        if (numberOfBalkAttacked == 0) return TargetPredicate()
+//          numberOfBalkAttacked  gameInfo.bombs[position.row][position.col] = gameInfo.timestamp + 2000
         val commandToSafe = BotHandler.move(
             position = position,
             gameInfo = gameInfo,
@@ -72,21 +102,17 @@ class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfB
             isNearBomb = false,
             noCheckTimeOfBomb = true,
         )
-//        val commandToBestSafe = BotHandler.move(
-//            gameInfo = gameInfo,
-//            targetPredicate = AvoidBombCanMoveStrategy(),
-//            isNearBomb = false,
-//            noCheckTimeOfBomb = true
-//        )
         val canMove = gameInfo.checkCanMoveSafe(position)
-        //ln("START check to drop bomb result = $commandToSafe")
-//            gameInfo.bombs[position.row][position.col] = oldTimeStamp
         val isTarget =
             commandToSafe.isNotEmpty()
 
         return TargetPredicate(
             isTarget = canDropBomb,
             commandNeedPerformed = Command.BOMB.takeIf { isTarget && canMove })
+    }
+
+    companion object {
+        const val DROP_ANY_BALK = Int.MAX_VALUE
     }
 }
 
@@ -111,7 +137,7 @@ class AttackCompetitorEggStrategy(private val dropBombLastTime: Long) : Strategy
     }
 }
 
-class GetSpoilsStrategy : StrategyMove {
+class GetSpoilsStrategy(private val dropBombLastTime: Long) : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         //ln("GEt GetSpoilsStrategy")
         val isPositionHaveSpoilNeedGet = gameInfo.checkSpoilNeedGet(
@@ -122,6 +148,7 @@ class GetSpoilsStrategy : StrategyMove {
                 SpoilType.DELAY_TIME_DRAGON_EGG
             )
         )
-        return TargetPredicate(isTarget = isPositionHaveSpoilNeedGet)
+        val bombCommand = getBombCommand(position = position, gameInfo = gameInfo, dropBombLastTime = dropBombLastTime)
+        return TargetPredicate(isTarget = isPositionHaveSpoilNeedGet, commandNeedPerformed = bombCommand)
     }
 }

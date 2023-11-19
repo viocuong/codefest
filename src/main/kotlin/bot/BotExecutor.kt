@@ -112,8 +112,9 @@ class BotExecutor {
             else -> {}
         }
 //        if (gameInfo.timestamp - lastTime > 50) {
-            lastTime = gameInfo.timestamp
-            startMove(gameInfo)
+        sendCommand(Command.STOP, gameInfo)
+        lastTime = gameInfo.timestamp
+        startMove(gameInfo)
 //        }
     }
 
@@ -177,7 +178,8 @@ class BotExecutor {
             BotHandler.move(
                 position = gameInfo.player.currentPosition,
                 gameInfo = gameInfo,
-                targetPredicate = GetSpoilsStrategy()
+                targetPredicate = GetSpoilsStrategy(dropBombLastTime),
+                notDropBombWhenStart = true
             )
 //        //ln("DROP bomb = $dropBombDirections")
 //        //ln("GET spoil = $getSpoilDirections")
@@ -194,11 +196,11 @@ class BotExecutor {
             return@coroutineScope
         }
         val command =
-            if (getSpoilDirections.isNotEmpty() && (dropBombDirections.isEmpty() || getSpoilDirections.size <= dropBombDirections.size)) {
-//                //ln("GET SPOIL = $getSpoilDirections")
+            if (getSpoilDirections.isNotEmpty()) {
+                println("GET SPOIL = $getSpoilDirections")
                 getSpoilDirections.firstOrNull()
             } else {
-//                //ln("DROP BOMB = $dropBombDirections")
+                println("DROP BOMB = $dropBombDirections")
                 dropBombDirections.firstOrNull()
             }
         sendCommand(command, gameInfo)
@@ -224,24 +226,12 @@ class BotExecutor {
                 BotHandler.move(
                     position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
-                    targetPredicate = DropBombStrategy(dropBombLastTime, numberOfBalk = 1),
+                    targetPredicate = DropBombStrategy(dropBombLastTime),
                 )
             }
         )
-        val (direction3, direction2, direction1) = allDirections
-        when {
-            direction3.isNotEmpty() && direction3.size == allDirections.minOf { it.size } -> {
-                direction3
-            }
-
-            direction2.isNotEmpty() && direction2.size == allDirections.minOf { it.size } -> {
-                direction2
-            }
-
-            else -> {
-                direction1
-            }
-        }
+        val (direction3, direction2, anyDropBalkDirection) = allDirections
+        anyDropBalkDirection
     }
 
     private fun sendCommand(command: Command?, gameInfo: GameInfo) {

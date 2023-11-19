@@ -77,6 +77,7 @@ data class GameInfo(
     }
 
     fun checkPositionIsNearBalk(position: Position): Int {
+        log.warning("checkPositionIsNearBalk = $position")
         val itemsBombNotAttackOver = listOf(ItemType.WALL)
         var index = 0
         val numberOfBalkAttacked = 0
@@ -93,11 +94,11 @@ data class GameInfo(
                     if (!checkPositionInbound(nextPosition)) continue
                     val isNotAttack = getItem(nextPosition) in itemsBombNotAttackOver
                     val isItemBalk = getItem(nextPosition) == ItemType.BALK
-                    when (BotHandler.getCommand(index)) {
+                    when (BotHandler.getCommand(i)) {
                         Command.LEFT -> {
                             if (balkLeft != NO_ATTACK_BALK && isNotAttack) {
                                 balkLeft = NO_ATTACK_BALK
-                            } else if (isItemBalk) {
+                            } else if (isItemBalk && balkLeft != NO_ATTACK_BALK) {
                                 balkLeft = 1
                             }
                         }
@@ -105,17 +106,15 @@ data class GameInfo(
                         Command.UP -> {
                             if (balkUp != NO_ATTACK_BALK && isNotAttack) {
                                 balkUp = NO_ATTACK_BALK
-                            } else if (isItemBalk) {
+                            } else if (isItemBalk && balkUp != NO_ATTACK_BALK) {
                                 balkUp = 1
                             }
                         }
 
-                        Command.RIGHT
-
-                        -> {
+                        Command.RIGHT -> {
                             if (balkRight != NO_ATTACK_BALK && isNotAttack) {
                                 balkRight = NO_ATTACK_BALK
-                            } else if (isItemBalk) {
+                            } else if (isItemBalk && balkRight != NO_ATTACK_BALK) {
                                 balkRight = 1
                             }
                         }
@@ -123,7 +122,7 @@ data class GameInfo(
                         else -> {
                             if (balkDown != NO_ATTACK_BALK && isNotAttack) {
                                 balkDown = NO_ATTACK_BALK
-                            } else if (isItemBalk) {
+                            } else if (isItemBalk && balkDown != NO_ATTACK_BALK) {
                                 balkDown = 1
                             }
                         }
@@ -132,6 +131,7 @@ data class GameInfo(
             }
             index++
         }
+        if(player.id == "player2-xxx")log.info("Number of balk= ${listOf(balkLeft, balkUp, balkRight, balkDown).filter { it != NO_ATTACK_BALK }.sum()}")
         return listOf(balkLeft, balkUp, balkRight, balkDown).filter { it != NO_ATTACK_BALK }.sum()
 //        for (i in 0 until 4) {
 //            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
@@ -185,7 +185,9 @@ data class GameInfo(
             log.warning("Earliest = $bombExposedEarliest | current = $timeOfCurrentBomb, distance = ${timeOfCurrentBomb - bombExposedEarliest}")
             log.warning("other bomb = ${otherBombs}")
         }
-        return timeOfCurrentBomb == bombExposedEarliest && otherBombs.size == 1
+        otherBombs.toList().fold(0L) { s, n -> s - n }
+        return timeOfCurrentBomb == bombExposedEarliest && otherBombs.size == 1 ||
+                (otherBombs.size >1 && abs((otherBombs.firstOrNull()?: 0L)  - (otherBombs.lastOrNull()?:0L)) in 0..300)
     }
 
     fun getTimeOfBomb(position: Position): Long {
@@ -199,7 +201,7 @@ data class GameInfo(
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
                     if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
                         bombExposedEarliest = minOf(bombExposedEarliest, bombs[x][y])
-                        if(index == 0) return bombExposedEarliest
+                        if (index == 0) return bombExposedEarliest
                     }
                 }
             }
