@@ -31,8 +31,9 @@ class AvoidBombCanMoveStrategy : StrategyMove {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
         //ln("Player is near bomb position = $position, isSafe $isSafePosition")
         val isCanMove = gameInfo.checkCanMoveSafe(position)
+
         return TargetPredicate(
-            isTarget = isSafePosition && isCanMove
+            isTarget = isSafePosition && isCanMove && gameInfo.checkPositionIsNearBalk(position) >0
         )
     }
 }
@@ -145,7 +146,8 @@ class GetSpoilsStrategy(private val dropBombLastTime: Long) : StrategyMove {
             spoilsNeedGet = listOf(
                 SpoilType.ATTACK_DRAGON_EGG,
                 SpoilType.SPEED_DRAGON_EGG,
-                SpoilType.DELAY_TIME_DRAGON_EGG
+                SpoilType.DELAY_TIME_DRAGON_EGG,
+                SpoilType.MYSTIC_DRAGON_EGG
             )
         )
         val bombCommand = getBombCommand(position = position, gameInfo = gameInfo, dropBombLastTime = dropBombLastTime)

@@ -12,7 +12,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         val botExecutor = BotExecutor()
         botExecutor.initGame(
             host = "http://localhost",
-            clientInfo = PlayerInfo(gameId = "fe0e4970-5737-4a7d-b664-c8312bf86ffe", playerId = "player1-xxx"),
+            clientInfo = PlayerInfo(gameId = "6d0cefcf-032d-4457-9f55-40b276b4cac7", playerId = "player1-xxx"),
         )
     }
 //
@@ -20,7 +20,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         val botExecutor = BotExecutor()
         botExecutor.initGame(
             host = "http://localhost",
-            clientInfo = PlayerInfo(gameId = "fe0e4970-5737-4a7d-b664-c8312bf86ffe", playerId = "player2-xxx"),
+            clientInfo = PlayerInfo(gameId = "6d0cefcf-032d-4457-9f55-40b276b4cac7", playerId = "player2-xxx"),
         )
     }
 }

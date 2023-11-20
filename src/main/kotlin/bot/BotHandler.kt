@@ -24,11 +24,14 @@ object BotHandler {
         isNearBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
         timeOfCurrentBomb: Long = 0,
-        notDropBombWhenStart: Boolean = false,
+        dropBombWhenGetSpoil: Boolean = false,
     ): List<Command> {
 //        val playerPosition = gameInfo.player.currentPosition
         val beginTargetPredicate = targetPredicate.predicate(position, gameInfo)
-        if (!notDropBombWhenStart && beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(Command.BOMB)
+        if (beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(Command.BOMB)
+//        if (dropBombWhenGetSpoil && gameInfo.getSpoil(position) in spoilNeedGet && beginTargetPredicate.commandNeedPerformed == Command.BOMB) return listOf(
+//            Command.BOMB
+//        )
         val competitorPosition = gameInfo.competitor.currentPosition
         val visits: List<MutableList<Boolean>> =
             List(gameInfo.mapInfo.size.rows) { MutableList(gameInfo.mapInfo.size.cols) { false } }
@@ -153,7 +156,6 @@ object BotHandler {
         if (gameInfo.mapInfo.bombs.any { it.row == position.row && it.col == position.col }) return false
         val item = gameInfo.mapInfo.map[position.row][position.col]
         val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
-        // TODO remove comment if can move over competitor.
         if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
 //        //ln("player = ${gameInfo.playerId}, checkNearBomb")
         if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(
@@ -206,6 +208,9 @@ object BotHandler {
             else -> Command.DOWN
         }
     }
+
+    private val spoilNeedGet =
+        listOf(SpoilType.DELAY_TIME_DRAGON_EGG, SpoilType.SPEED_DRAGON_EGG, SpoilType.ATTACK_DRAGON_EGG)
 
     private val log = Logger.getLogger(BotExecutor::class.java.name)
     private val notShouldMoveSpoils = listOf<SpoilType>()

@@ -131,7 +131,16 @@ data class GameInfo(
             }
             index++
         }
-        if(player.id == "player2-xxx")log.info("Number of balk= ${listOf(balkLeft, balkUp, balkRight, balkDown).filter { it != NO_ATTACK_BALK }.sum()}")
+        if (player.id == "player2-xxx") log.info(
+            "Number of balk= ${
+                listOf(
+                    balkLeft,
+                    balkUp,
+                    balkRight,
+                    balkDown
+                ).filter { it != NO_ATTACK_BALK }.sum()
+            }"
+        )
         return listOf(balkLeft, balkUp, balkRight, balkDown).filter { it != NO_ATTACK_BALK }.sum()
 //        for (i in 0 until 4) {
 //            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
@@ -187,7 +196,9 @@ data class GameInfo(
         }
         otherBombs.toList().fold(0L) { s, n -> s - n }
         return timeOfCurrentBomb == bombExposedEarliest && otherBombs.size == 1 ||
-                (otherBombs.size >1 && abs((otherBombs.firstOrNull()?: 0L)  - (otherBombs.lastOrNull()?:0L)) in 0..300)
+                (otherBombs.size > 1 && abs(
+                    (otherBombs.firstOrNull() ?: 0L) - (otherBombs.lastOrNull() ?: 0L)
+                ) in 0..100)
     }
 
     fun getTimeOfBomb(position: Position): Long {
@@ -259,7 +270,7 @@ data class GameInfo(
             ItemType.QUARANTINE_PLACE,
             ItemType.TELEPORT_GATE,
             ItemType.DRAGON_EGG_GST
-        ).contains(item) && spoilItem?.spoilType != SpoilType.MYSTIC_DRAGON_EGG
+        ).contains(item)
     }
 
     fun checkCanMoveSafe(position: Position): Boolean {
@@ -289,6 +300,10 @@ data class GameInfo(
 
     fun getItem(position: Position): ItemType {
         return mapInfo.map[position.row][position.col]
+    }
+
+    fun getSpoil(position: Position) : SpoilType? {
+        return mapInfo.spoils.firstOrNull { it.row == position.row  && it.col  == position.col}?.spoilType
     }
 
     override fun toString(): String {

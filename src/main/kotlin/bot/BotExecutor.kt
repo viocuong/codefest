@@ -11,7 +11,6 @@ import utils.JsonConverter
 import utils.JsonConverter.toJson
 import utils.onFLow
 import java.util.logging.Logger
-import kotlin.coroutines.suspendCoroutine
 
 enum class Event(val value: String) {
     JOIN_GAME("join game"),
@@ -30,7 +29,7 @@ class BotExecutor {
             botSocket = this
             on(Event.JOIN_GAME.value) { args ->
                 val gameInfo = JsonConverter.fromJson<PlayerInfo>(args[0] as JSONObject)
-                if (clientInfo.playerId.contains(gameInfo?.playerId ?: "")) {
+                if (clientInfo.playerId?.contains(gameInfo?.playerId ?: "") == true) {
                     playerId = gameInfo?.playerId ?: ""
                 }
 //                //ln("Join game $data")
@@ -179,7 +178,6 @@ class BotExecutor {
                 position = gameInfo.player.currentPosition,
                 gameInfo = gameInfo,
                 targetPredicate = GetSpoilsStrategy(dropBombLastTime),
-                notDropBombWhenStart = true
             )
 //        //ln("DROP bomb = $dropBombDirections")
 //        //ln("GET spoil = $getSpoilDirections")
@@ -196,12 +194,14 @@ class BotExecutor {
             return@coroutineScope
         }
         val command =
-            if (getSpoilDirections.isNotEmpty()) {
+            if (getSpoilDirections.isNotEmpty() && dropBombDirections.isNotEmpty() && getSpoilDirections.size <= dropBombDirections.size * 2) {
                 println("GET SPOIL = $getSpoilDirections")
                 getSpoilDirections.firstOrNull()
-            } else {
+            } else if(dropBombDirections.isNotEmpty()) {
                 println("DROP BOMB = $dropBombDirections")
                 dropBombDirections.firstOrNull()
+            } else {
+                listOf(getSpoilDirections, dropBombDirections).firstOrNull { it.isNotEmpty() }?.firstOrNull()
             }
         sendCommand(command, gameInfo)
     }
@@ -231,7 +231,11 @@ class BotExecutor {
             }
         )
         val (direction3, direction2, anyDropBalkDirection) = allDirections
-        anyDropBalkDirection
+        when {
+            direction3.size in 1..7 -> direction3
+            direction2.size in 1..7 -> direction2
+            else -> anyDropBalkDirection
+        }
     }
 
     private fun sendCommand(command: Command?, gameInfo: GameInfo) {
