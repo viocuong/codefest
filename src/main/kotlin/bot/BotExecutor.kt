@@ -153,7 +153,7 @@ class BotExecutor {
                         gameInfo = gameInfo,
                         isNearBomb = true,
                         noCheckTimeOfBomb = true,
-                        targetPredicate = AvoidBombCanMoveStrategy(),
+                        targetPredicate = AvoidBombCanMoveStrategy(dropBombLastTime),
                         timeOfCurrentBomb = timeOfBomb,
                     )
                 }

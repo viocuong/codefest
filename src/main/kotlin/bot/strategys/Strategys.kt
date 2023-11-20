@@ -19,14 +19,14 @@ class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : St
             isTarget = isTarget
         )
     }
-
-    private fun checkPositionIsNearBomb(gameInfo: GameInfo, position: Position, bombPosition: Position): Boolean {
-        if (position.row == bombPosition.row && abs(position.col - bombPosition.col) <= gameInfo.lengthOfBomb) return true
-        return position.col == bombPosition.col && abs(position.row - bombPosition.row) <= gameInfo.lengthOfBomb
-    }
 }
 
-class AvoidBombCanMoveStrategy : StrategyMove {
+private fun checkPositionIsNearBomb(gameInfo: GameInfo, position: Position, bombPosition: Position): Boolean {
+    if (position.row == bombPosition.row && abs(position.col - bombPosition.col) <= gameInfo.lengthOfBomb) return true
+    return position.col == bombPosition.col && abs(position.row - bombPosition.row) <= gameInfo.lengthOfBomb
+}
+
+class AvoidBombCanMoveStrategy(private val dropBombLastTime: Long) : StrategyMove {
     override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
         //ln("Player is near bomb position = $position, isSafe $isSafePosition")
