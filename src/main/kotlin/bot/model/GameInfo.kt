@@ -31,7 +31,6 @@ data class GameInfo(
     val competitor: Player get() = mapInfo.players.first { it.id != playerId }
 
     val isActionOfPlayer: Boolean get() = playerIdOfAction == playerId
-
     fun checkPositionIsNearCompetitorEgg(position: Position): Boolean {
         if (playerId == "player2-xxx") {
             //ln("checkPositionIsNearCompetitorEgg $position")
@@ -76,6 +75,72 @@ data class GameInfo(
 //        return false
     }
 
+    fun checkPositionIsNearCompetitor(position: Position): Boolean {
+        val itemsBombNotAttackOver = listOf(ItemType.WALL)
+        var index = 0
+        val numberOfBalkAttacked = 0
+        var balkLeft = 0
+        var balkUp = 0
+        var balkRight = 0
+        var balkDown = 0
+        while (index <= lengthOfBomb) {
+            for (i in dx.indices) {
+                val x = position.row + dx[i] * index
+                val y = position.col + dy[i] * index
+                if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
+                    val nextPosition = Position(row = x, col = y)
+                    if (!checkPositionInbound(nextPosition)) continue
+                    val isNotAttack =
+                        getItem(nextPosition) in itemsBombNotAttackOver && mapInfo.dragonEggGSTArray.none { it.row == nextPosition.row && it.col == nextPosition.col }
+                    val isCompetitor = nextPosition == competitor.currentPosition
+                    when (BotHandler.getCommand(i)) {
+                        Command.LEFT -> {
+                            if (balkLeft != NO_ATTACK_BALK && isNotAttack) {
+                                balkLeft = NO_ATTACK_BALK
+                            } else if (isCompetitor && balkLeft != NO_ATTACK_BALK) {
+                                return true
+                            }
+                        }
+
+                        Command.UP -> {
+                            if (balkUp != NO_ATTACK_BALK && isNotAttack) {
+                                balkUp = NO_ATTACK_BALK
+                            } else if (isCompetitor && balkUp != NO_ATTACK_BALK) {
+                                return true
+                            }
+                        }
+
+                        Command.RIGHT -> {
+                            if (balkRight != NO_ATTACK_BALK && isNotAttack) {
+                                balkRight = NO_ATTACK_BALK
+                            } else if (isCompetitor && balkRight != NO_ATTACK_BALK) {
+                                return true
+                            }
+                        }
+
+                        else -> {
+                            if (balkDown != NO_ATTACK_BALK && isNotAttack) {
+                                balkDown = NO_ATTACK_BALK
+                            } else if (isCompetitor && balkDown != NO_ATTACK_BALK) {
+                                return true
+                            }
+                        }
+                    }
+                }
+            }
+            index++
+        }
+        return false
+//        for (i in 0 until 4) {
+//            val nextPosition = Position(row = position.row + dx[i], col = position.col + dy[i])
+//
+//            if (checkPositionInbound(nextPosition) && checkPositionIsItem(nextPosition, item = ItemType.BALK)) {
+//                return true
+//            }
+//        }
+//        return false
+    }
+
     fun checkPositionIsNearBalk(position: Position): Int {
         log.warning("checkPositionIsNearBalk = $position")
         val itemsBombNotAttackOver = listOf(ItemType.WALL)
@@ -92,7 +157,8 @@ data class GameInfo(
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
                     val nextPosition = Position(row = x, col = y)
                     if (!checkPositionInbound(nextPosition)) continue
-                    val isNotAttack = getItem(nextPosition) in itemsBombNotAttackOver
+                    val isNotAttack =
+                        getItem(nextPosition) in itemsBombNotAttackOver && mapInfo.dragonEggGSTArray.none { it.row == nextPosition.row && it.col == nextPosition.col }
                     val isItemBalk = getItem(nextPosition) == ItemType.BALK
                     when (BotHandler.getCommand(i)) {
                         Command.LEFT -> {
@@ -174,6 +240,7 @@ data class GameInfo(
         var index = 0
         var bombExposedEarliest = Long.MIN_VALUE
         val otherBombs = mutableSetOf<Long>()
+        val markBombs = mutableMapOf<String, MutableSet<Long>>()
         while (index <= lengthOfBomb) {
             for (i in dx.indices) {
                 val x = position.row + dx[i] * index
@@ -182,6 +249,8 @@ data class GameInfo(
                 if (x >= 0 && x < mapInfo.size.rows && y >= 0 && y < mapInfo.size.cols) {
                     if (bombs[x][y] + BUFFER_TIME_END_OF_BOMB > timestamp) {
                         bombExposedEarliest = maxOf(bombExposedEarliest, bombs[x][y])
+                        markBombs.putIfAbsent("$x$y", mutableSetOf())
+                        markBombs["$x$y"]?.add(bombs[x][y])
                         otherBombs.add(bombs[x][y])
                     }
                 }
@@ -194,11 +263,11 @@ data class GameInfo(
             log.warning("Earliest = $bombExposedEarliest | current = $timeOfCurrentBomb, distance = ${timeOfCurrentBomb - bombExposedEarliest}")
             log.warning("other bomb = ${otherBombs}")
         }
-        otherBombs.toList().fold(0L) { s, n -> s - n }
+//        if()
         return timeOfCurrentBomb == bombExposedEarliest && otherBombs.size == 1 ||
                 (otherBombs.size > 1 && abs(
                     (otherBombs.firstOrNull() ?: 0L) - (otherBombs.lastOrNull() ?: 0L)
-                ) in 0..100)
+                ) in 0..500)
     }
 
     fun getTimeOfBomb(position: Position): Long {
@@ -302,8 +371,8 @@ data class GameInfo(
         return mapInfo.map[position.row][position.col]
     }
 
-    fun getSpoil(position: Position) : SpoilType? {
-        return mapInfo.spoils.firstOrNull { it.row == position.row  && it.col  == position.col}?.spoilType
+    fun getSpoil(position: Position): SpoilType? {
+        return mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }?.spoilType
     }
 
     override fun toString(): String {

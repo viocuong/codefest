@@ -33,7 +33,7 @@ class AvoidBombCanMoveStrategy : StrategyMove {
         val isCanMove = gameInfo.checkCanMoveSafe(position)
 
         return TargetPredicate(
-            isTarget = isSafePosition && isCanMove && gameInfo.checkPositionIsNearBalk(position) >0
+            isTarget = isSafePosition && isCanMove && gameInfo.checkPositionIsNearBalk(position) > 0
         )
     }
 }
@@ -152,5 +152,26 @@ class GetSpoilsStrategy(private val dropBombLastTime: Long) : StrategyMove {
         )
         val bombCommand = getBombCommand(position = position, gameInfo = gameInfo, dropBombLastTime = dropBombLastTime)
         return TargetPredicate(isTarget = isPositionHaveSpoilNeedGet, commandNeedPerformed = bombCommand)
+    }
+}
+
+class KillCompetitorStrategy(private val dropBombLastTime: Long) : StrategyMove {
+    override fun predicate(position: Position, gameInfo: GameInfo): TargetPredicate {
+        val isCanKillPlayer = gameInfo.checkPositionIsNearCompetitor(
+            position = position
+        )
+        if (!isCanKillPlayer) return TargetPredicate()
+        val commandToSafe = BotHandler.move(
+            position = position,
+            gameInfo = gameInfo,
+            targetPredicate = AvoidBombStrategy(position),
+            isNearBomb = false,
+            noCheckTimeOfBomb = true,
+        )
+        return if (gameInfo.timestamp - dropBombLastTime <= gameInfo.player.delay) {
+            TargetPredicate()
+        } else {
+            TargetPredicate(isTarget = true, commandNeedPerformed = Command.BOMB.takeIf { commandToSafe.isNotEmpty() })
+        }
     }
 }
