@@ -9,8 +9,63 @@ interface StrategyMove {
     fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean = false): TargetPredicate
 }
 
+class MoveToTargetStrategy(private val target: Position) : StrategyMove {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
+        return TargetPredicate(
+            isTarget = position.row == target.row && position.col == target.col
+        )
+    }
+}
+
+class KillMaxPowerStrategy(private val dropBombLastTime: Long, private val lengthOfBomb: Int = 0) : StrategyMove {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
+        val isCanKillPlayer = gameInfo.checkPositionIsNearCompetitor(
+            position = position,
+            lengthOfBomb = lengthOfBomb
+        )
+        if (!isCanKillPlayer) return TargetPredicate()
+        val commandToSafe = BotHandler.move(
+            position = position,
+            gameInfo = gameInfo,
+            targetPredicate = AvoidBombStrategy(position),
+            isNearBomb = false,
+            noCheckTimeOfBomb = true,
+        )
+        val commandCompetitorToSafe = BotHandler.move(
+            position = gameInfo.competitor.currentPosition,
+            gameInfo = gameInfo,
+            targetPredicate = AvoidBombStrategy(position),
+            isNearBomb = false,
+            bomPosition = position,
+            noCheckTimeOfBomb = true,
+        )
+        return if (gameInfo.timestamp - dropBombLastTime <= gameInfo.player.delay) {
+            TargetPredicate()
+        } else {
+            TargetPredicate(
+                isTarget = true,
+                commandNeedPerformed = Command.BOMB.takeIf {
+                    commandToSafe.isNotEmpty() &&
+                            commandCompetitorToSafe.isEmpty()
+                })
+        }
+    }
+}
+
 class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
         //ln("Player is near bomb position = $position, isSafe $isSafePosition")
         val isTarget =
@@ -27,7 +82,11 @@ private fun checkPositionIsNearBomb(gameInfo: GameInfo, position: Position, bomb
 }
 
 class AvoidBombCanMoveStrategy(private val dropBombLastTime: Long) : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         val isSafePosition = gameInfo.checkPositionIsSafe(position)
         //ln("Player is near bomb position = $position, isSafe $isSafePosition")
 //        val isCanMove = gameInfo.checkCanMoveSafe(position)
@@ -43,7 +102,11 @@ class AvoidBombCanMoveStrategy(private val dropBombLastTime: Long) : StrategyMov
 }
 
 class AvoidBombAndGetSpoil : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         //ln("AvoidBombAndGetSpoil player = ${gameInfo.playerId} position = $position")
         val isSafePosition = gameInfo.checkPositionIsSafe(position) && gameInfo.checkSpoilNeedGet(
             position,
@@ -63,7 +126,12 @@ class AvoidBombAndGetSpoil : StrategyMove {
 /**
  * Check and return Bomb command if can drop bomb
  */
-private fun getBombCommand(position: Position, gameInfo: GameInfo, dropBombLastTime: Long, numberOfBalk: Int): Command? {
+private fun getBombCommand(
+    position: Position,
+    gameInfo: GameInfo,
+    dropBombLastTime: Long,
+    numberOfBalk: Int
+): Command? {
     val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
         position = position
     )
@@ -90,7 +158,11 @@ private fun getBombCommand(position: Position, gameInfo: GameInfo, dropBombLastT
 
 class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfBalk: Int = DROP_ANY_BALK) :
     StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         val numberOfBalkAttacked = gameInfo.checkPositionIsNearBalk(
             position = position
         )
@@ -124,7 +196,11 @@ class DropBombStrategy(private val dropBombLastTime: Long, private val numberOfB
 }
 
 class AttackCompetitorEggStrategy(private val dropBombLastTime: Long) : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         val isPositionNeedAttack = gameInfo.checkPositionIsNearCompetitorEgg(
             position = position
         )
@@ -146,7 +222,11 @@ class AttackCompetitorEggStrategy(private val dropBombLastTime: Long) : Strategy
 
 // Get spoil and drop bomb
 class GetSpoilsStrategy(private val dropBombLastTime: Long) : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         //ln("GEt GetSpoilsStrategy")
         val isPositionHaveSpoilNeedGet = gameInfo.checkSpoilNeedGet(
             position,
@@ -157,16 +237,28 @@ class GetSpoilsStrategy(private val dropBombLastTime: Long) : StrategyMove {
                 SpoilType.MYSTIC_DRAGON_EGG
             )
         )
-        val bombCommand = getBombCommand(position = position, gameInfo = gameInfo, dropBombLastTime = dropBombLastTime, numberOfBalk = 3)
+        val bombCommand = getBombCommand(
+            position = position,
+            gameInfo = gameInfo,
+            dropBombLastTime = dropBombLastTime,
+            numberOfBalk = 3
+        )
 //        println("Drop bomb getSpoid =" + bombCommand.takeIf { needDropBombWhenStartMove })
-        return TargetPredicate(isTarget = isPositionHaveSpoilNeedGet, commandNeedPerformed = bombCommand.takeIf { needDropBombWhenStartMove })
+        return TargetPredicate(
+            isTarget = isPositionHaveSpoilNeedGet,
+            commandNeedPerformed = bombCommand.takeIf { needDropBombWhenStartMove })
     }
 }
 
-class KillCompetitorStrategy(private val dropBombLastTime: Long) : StrategyMove {
-    override fun predicate(position: Position, gameInfo: GameInfo, needDropBombWhenStartMove: Boolean): TargetPredicate {
+class KillCompetitorStrategy(private val dropBombLastTime: Long, private val lengthOfBomb: Int) : StrategyMove {
+    override fun predicate(
+        position: Position,
+        gameInfo: GameInfo,
+        needDropBombWhenStartMove: Boolean
+    ): TargetPredicate {
         val isCanKillPlayer = gameInfo.checkPositionIsNearCompetitor(
-            position = position
+            position = position,
+            lengthOfBomb = lengthOfBomb
         )
         if (!isCanKillPlayer) return TargetPredicate()
         val commandToSafe = BotHandler.move(

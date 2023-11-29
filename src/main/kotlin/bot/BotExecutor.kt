@@ -123,12 +123,76 @@ class BotExecutor {
     private var targetPosition: Position? = null
     private var isMoving: Boolean = false
 
+    private suspend fun performKill(gameInfo: GameInfo, fullPower: Boolean = false): Boolean = coroutineScope {
+        val directionKillFullPower = BotHandler.move(
+            position = gameInfo.player.currentPosition,
+            gameInfo = gameInfo,
+            targetPredicate = KillMaxPowerStrategy(dropBombLastTime, 1),
+        )
+        val directionPower = mutableListOf<List<Command>>()
+        val directionNormal = mutableListOf<List<Command>>()
+        for (i in 1..gameInfo.lengthOfBomb) {
+            directionPower.add(async {
+                BotHandler.move(
+                    position = gameInfo.player.currentPosition,
+                    gameInfo = gameInfo,
+                    targetPredicate = KillMaxPowerStrategy(dropBombLastTime, i),
+                )
+            }.await())
+            directionNormal.add(async {
+                BotHandler.move(
+                    position = gameInfo.player.currentPosition,
+                    gameInfo = gameInfo,
+                    targetPredicate = KillCompetitorStrategy(dropBombLastTime, i),
+                )
+            }.await())
+        }
+        val directionPowerResult = directionPower.filter { it.any { it == Command.BOMB } }
+        val directionNormalResult = directionNormal.filter { it.any { it == Command.BOMB } }
+        val command = if (directionPowerResult.isNotEmpty()) {
+            directionPowerResult.firstOrNull()?.firstOrNull()
+        } else if (fullPower) {
+            directionNormalResult.firstOrNull()?.firstOrNull()
+        } else {
+            null
+        }
+        println("Kill is = $command")
+        sendCommand(command, gameInfo)
+        return@coroutineScope command != null
+    }
+
     private suspend fun startMove(gameInfo: GameInfo, killMode: Boolean) = coroutineScope {
         // Check if player is dangerous, and move to safe zone.
 //        //ln("player = ${gameInfo.player}, currentPosition = ${gameInfo.player.currentPosition}, boms = ${gameInfo.mapInfo.bombs}")
         if (gameInfo.checkIsNearBomb(noCheckTime = true)) {
             moveToSaveZone(gameInfo)
             return@coroutineScope
+        }
+
+        // Perform kill competitor
+        if (killMode && isNearCompetitor(gameInfo)) {
+            if (performKill(gameInfo, true)) {
+                return@coroutineScope
+            }
+//            val directionKillFullPower = BotHandler.move(
+//                position = gameInfo.player.currentPosition,
+//                gameInfo = gameInfo,
+//                targetPredicate = KillMaxPowerStrategy(dropBombLastTime),
+//            )
+//
+//            val killCompetitorDirections = BotHandler.move(
+//                position = gameInfo.player.currentPosition,
+//                gameInfo = gameInfo,
+//                targetPredicate = KillCompetitorStrategy(dropBombLastTime),
+//            )
+//            val command = if (directionKillFullPower.any { it == Command.BOMB }) {
+//                directionKillFullPower
+//            } else {
+//                killCompetitorDirections
+//            }
+//            println("Kill is = $command")
+//            sendCommand(command.firstOrNull(), gameInfo)
+//            if (command.isNotEmpty()) return@coroutineScope
         }
 
         val dropBombDirections = getDirectionsDropBomb(gameInfo)
@@ -140,24 +204,22 @@ class BotExecutor {
             )
         if (dropBombDirections.isEmpty() && getSpoilDirections.isEmpty()) {
 //            log.info("Attack competitor egg")
-            val killCompetitorDirections = BotHandler.move(
-                position = gameInfo.player.currentPosition,
-                gameInfo = gameInfo,
-                targetPredicate = KillCompetitorStrategy(dropBombLastTime),
-            )
-            val directionsAttach =
+//            val killCompetitorDirections = BotHandler.move(
+//                position = gameInfo.player.currentPosition,
+//                gameInfo = gameInfo,
+//                targetPredicate = KillCompetitorStrategy(dropBombLastTime),
+//            )
+            val directionsAttachEgg =
                 BotHandler.move(
                     position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
-            val attackCommand = if (killMode && gameInfo.player.score <= gameInfo.competitor.score) {
-                killCompetitorDirections.firstOrNull()
+            if (killMode && gameInfo.player.score <= gameInfo.competitor.score) {
+                performKill(gameInfo, true)
             } else {
-                directionsAttach.firstOrNull()
+                sendCommand(directionsAttachEgg.firstOrNull(), gameInfo)
             }
-
-            sendCommand(attackCommand, gameInfo)
             return@coroutineScope
         }
         val command =
@@ -261,10 +323,21 @@ class BotExecutor {
         """.trimIndent()
         )
         when {
-            direction3.size in 1..10 -> direction3
+            direction3.size in 1..6 -> direction3
             direction2.size in 1..5 -> direction2
             else -> anyDropBalkDirection
         }
+    }
+
+    private fun isNearCompetitor(gameInfo: GameInfo): Boolean {
+        val directionToCompetitor = BotHandler.move(
+            position = gameInfo.player.currentPosition,
+            noCheckBomb = true,
+            noCheckCompetitorPosition = true,
+            gameInfo = gameInfo, targetPredicate = MoveToTargetStrategy(target = gameInfo.competitor.currentPosition)
+        )
+        println("Direction size ${directionToCompetitor.isNotEmpty()} = ${directionToCompetitor.size}")
+        return directionToCompetitor.size in 1..DISTANCE_NEAR_COMPETITOR
     }
 
     private fun sendCommand(command: Command?, gameInfo: GameInfo) {
@@ -281,5 +354,6 @@ class BotExecutor {
         const val COMPLETE_EXPOSED_TIME = 700L
         val log = Logger.getLogger(BotExecutor::class.java.name)
         private const val CONTINUE_MOVE_CNT = 3
+        private const val DISTANCE_NEAR_COMPETITOR = 12
     }
 }

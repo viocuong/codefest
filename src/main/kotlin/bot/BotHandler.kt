@@ -24,6 +24,8 @@ object BotHandler {
         isNearBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
         timeOfCurrentBomb: Int = 0,
+        noCheckCompetitorPosition: Boolean = false,
+        bomPosition: Position = Position.NONE,
         noCheckBomb: Boolean = false,
     ): List<Command> {
 //        val playerPosition = gameInfo.player.currentPosition
@@ -66,6 +68,7 @@ object BotHandler {
                         position = nextPosition,
                         competitorPosition = competitorPosition,
                         gameInfo = gameInfo,
+                        noCheckCompetitorPosition = noCheckCompetitorPosition,
                         forceMoveOverBomb = noCheckBomb || moveOverBomb || playerIsFreeze,
                         noCheckTimeOfBomb = noCheckTimeOfBomb
                     )
@@ -149,6 +152,7 @@ object BotHandler {
         position: Position,
         competitorPosition: Position,
         gameInfo: GameInfo,
+        noCheckCompetitorPosition: Boolean = false,
         forceMoveOverBomb: Boolean = false,
         noCheckTimeOfBomb: Boolean = false,
     ): Boolean {
@@ -157,7 +161,7 @@ object BotHandler {
         if (gameInfo.mapInfo.bombs.any { it.row == position.row && it.col == position.col }) return false
         val item = gameInfo.mapInfo.map[position.row][position.col]
         val spoilItem = gameInfo.mapInfo.spoils.firstOrNull { it.row == position.row && it.col == position.col }
-        if (position.row == competitorPosition.row && position.col == competitorPosition.col) return false
+        if (!noCheckCompetitorPosition && position.row == competitorPosition.row && position.col == competitorPosition.col) return false
 //        println("player = ${gameInfo.playerId}, checkNearBomb, positon = $position, force movebomb = $forceMoveOverBomb")
         if (!forceMoveOverBomb && gameInfo.checkIsNearBomb(
                 position = position,

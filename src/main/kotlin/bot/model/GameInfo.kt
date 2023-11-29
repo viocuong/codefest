@@ -81,15 +81,16 @@ data class GameInfo(
 ////        return false
     }
 
-    fun checkPositionIsNearCompetitor(position: Position): Boolean {
-        val itemsBombNotAttackOver = listOf(ItemType.WALL)
+    fun checkPositionIsNearCompetitor(position: Position, lengthOfBomb: Int = 0): Boolean {
+        val itemsBombNotAttackOver = listOf(ItemType.WALL, ItemType.QUARANTINE_PLACE)
         var index = 0
         val numberOfBalkAttacked = 0
         var balkLeft = 0
         var balkUp = 0
         var balkRight = 0
         var balkDown = 0
-        while (index <= lengthOfBomb) {
+        val bombPower = if (lengthOfBomb == 0) this.lengthOfBomb else lengthOfBomb
+        while (index <= bombPower) {
             for (i in dx.indices) {
                 val x = position.row + dx[i] * index
                 val y = position.col + dy[i] * index
@@ -335,7 +336,7 @@ data class GameInfo(
 //            println("bomb check near = ${getBombsAtPosition(position)}, currentPosition = ${player.currentPosition}")
 //        }
         return getBombsAtPosition(position).any { bomb ->
-            !doesHardItemBetweenPositions(position, bomb.position) && bomb.remainTime >=0
+            !doesHardItemBetweenPositions(position, bomb.position) && bomb.remainTime >= 0
         }
 //        while (index <= lengthOfBomb) {
 //            for (i in dx.indices) {
