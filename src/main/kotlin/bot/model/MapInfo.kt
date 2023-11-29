@@ -1,6 +1,5 @@
 package bot.model
 
-import bot.BombManager
 import com.squareup.moshi.FromJson
 import com.squareup.moshi.JsonClass
 

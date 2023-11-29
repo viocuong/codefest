@@ -3,6 +3,11 @@ import bot.model.PlayerInfo
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.IOException
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 fun main(args: Array<String>): Unit = runBlocking {
@@ -12,8 +17,8 @@ fun main(args: Array<String>): Unit = runBlocking {
         val botExecutor = BotExecutor()
         botExecutor.initGame(
             host = "http://localhost",
-            clientInfo = PlayerInfo(gameId = "0d2443cc-c2d6-4389-a7bb-69510de489ce", playerId = "player1-xxx"),
-            killMode = true
+            clientInfo = PlayerInfo(gameId = "02d295e2-6429-4a26-b459-42b75305260a", playerId = "player1-xxx"),
+            killMode = true,
         )
     }
 //
@@ -21,7 +26,7 @@ fun main(args: Array<String>): Unit = runBlocking {
         val botExecutor = BotExecutor()
         botExecutor.initGame(
             host = "http://localhost",
-            clientInfo = PlayerInfo(gameId = "0d2443cc-c2d6-4389-a7bb-69510de489ce", playerId = "player2-xxx"),
+            clientInfo = PlayerInfo(gameId = "02d295e2-6429-4a26-b459-42b75305260a", playerId = "player2-xxx"),
             killMode = true
         )
     }

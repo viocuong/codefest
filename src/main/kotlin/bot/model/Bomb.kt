@@ -12,4 +12,5 @@ data class Bomb(
     val endExposedTime: Long = 0
 ){
     val identify: String get() = "$col-$row-$playerId"
+    val position: Position get() = Position(col = col, row = row)
 }
