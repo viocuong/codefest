@@ -176,13 +176,14 @@ class BotExecutor {
         val remainTime = (endTime - currentTime) / 1000f / 60f
         println("Remain time = $remainTime")
         if (remainTime <= 1.5 && gameInfo.player.score + 20 < gameInfo.competitor.score) {
-            performKill(gameInfo, true)
-            return@coroutineScope
+            if (performKill(gameInfo, true)) {
+                return@coroutineScope
+            }
         }
 
         // Perform kill competitor
         if (killMode && isNearCompetitor(gameInfo)) {
-            if (performKill(gameInfo, fullPower = false)) {
+            if (performKill(gameInfo, fullPower = true)) {
                 return@coroutineScope
             }
         }
@@ -201,11 +202,7 @@ class BotExecutor {
                     gameInfo = gameInfo,
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
-            if (killMode && (gameInfo.player.score <= gameInfo.competitor.score || gameInfo.player.score == 0)) {
-                performKill(gameInfo, true)
-            } else {
-                sendCommand(directionsAttachEgg.firstOrNull(), gameInfo)
-            }
+            performKill(gameInfo, true)
             return@coroutineScope
         }
         val command =
@@ -340,6 +337,6 @@ class BotExecutor {
         const val COMPLETE_EXPOSED_TIME = 700L
         val log = Logger.getLogger(BotExecutor::class.java.name)
         private const val CONTINUE_MOVE_CNT = 3
-        private const val DISTANCE_NEAR_COMPETITOR = 12
+        private const val DISTANCE_NEAR_COMPETITOR = 10
     }
 }
