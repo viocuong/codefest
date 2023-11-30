@@ -25,6 +25,7 @@ class BotExecutor {
     private var bombManager: BombManager = BombManager()
     private var playerId: String = ""
     private var isMock = false
+    private var endTime = 0L
     suspend fun initGame(host: String, clientInfo: PlayerInfo, killMode: Boolean = false, isMock: Boolean = false) {
         this.isMock = isMock
         BotSocket.initSocket(host = host) {
@@ -68,6 +69,9 @@ class BotExecutor {
 
     private suspend fun onReceiveGame(gameInfo: GameInfo, killMode: Boolean) {
         if (isMock) return
+        if (endTime == 0L) {
+            endTime = System.currentTimeMillis() + 5 * 60 * 1000
+        }
         bombManager.init(gameInfo.mapInfo.size)
 //        log.info("GAME TAG = ${gameInfo.tag}")
         when (gameInfo.tag) {
@@ -168,31 +172,19 @@ class BotExecutor {
             moveToSaveZone(gameInfo)
             return@coroutineScope
         }
+        val currentTime = System.currentTimeMillis()
+        val remainTime = (endTime - currentTime) / 1000f / 60f
+        println("Remain time = $remainTime")
+        if (remainTime <= 1.5 && gameInfo.player.score + 20 < gameInfo.competitor.score) {
+            performKill(gameInfo, true)
+            return@coroutineScope
+        }
 
         // Perform kill competitor
         if (killMode && isNearCompetitor(gameInfo)) {
-            if (performKill(gameInfo, true)) {
+            if (performKill(gameInfo, fullPower = false)) {
                 return@coroutineScope
             }
-//            val directionKillFullPower = BotHandler.move(
-//                position = gameInfo.player.currentPosition,
-//                gameInfo = gameInfo,
-//                targetPredicate = KillMaxPowerStrategy(dropBombLastTime),
-//            )
-//
-//            val killCompetitorDirections = BotHandler.move(
-//                position = gameInfo.player.currentPosition,
-//                gameInfo = gameInfo,
-//                targetPredicate = KillCompetitorStrategy(dropBombLastTime),
-//            )
-//            val command = if (directionKillFullPower.any { it == Command.BOMB }) {
-//                directionKillFullPower
-//            } else {
-//                killCompetitorDirections
-//            }
-//            println("Kill is = $command")
-//            sendCommand(command.firstOrNull(), gameInfo)
-//            if (command.isNotEmpty()) return@coroutineScope
         }
 
         val dropBombDirections = getDirectionsDropBomb(gameInfo)
@@ -203,19 +195,13 @@ class BotExecutor {
                 targetPredicate = GetSpoilsStrategy(dropBombLastTime),
             )
         if (dropBombDirections.isEmpty() && getSpoilDirections.isEmpty()) {
-//            log.info("Attack competitor egg")
-//            val killCompetitorDirections = BotHandler.move(
-//                position = gameInfo.player.currentPosition,
-//                gameInfo = gameInfo,
-//                targetPredicate = KillCompetitorStrategy(dropBombLastTime),
-//            )
             val directionsAttachEgg =
                 BotHandler.move(
                     position = gameInfo.player.currentPosition,
                     gameInfo = gameInfo,
                     targetPredicate = AttackCompetitorEggStrategy(dropBombLastTime),
                 )
-            if (killMode && gameInfo.player.score <= gameInfo.competitor.score) {
+            if (killMode && (gameInfo.player.score <= gameInfo.competitor.score || gameInfo.player.score == 0)) {
                 performKill(gameInfo, true)
             } else {
                 sendCommand(directionsAttachEgg.firstOrNull(), gameInfo)

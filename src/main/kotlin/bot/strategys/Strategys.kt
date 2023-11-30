@@ -77,6 +77,7 @@ class AvoidBombStrategy(private val bombPosition: Position = Position.NONE) : St
 }
 
 private fun checkPositionIsNearBomb(gameInfo: GameInfo, position: Position, bombPosition: Position): Boolean {
+    if(gameInfo.doesHardItemBetweenPositions(position, bombPosition)) return false
     if (position.row == bombPosition.row && abs(position.col - bombPosition.col) <= gameInfo.lengthOfBomb) return true
     return position.col == bombPosition.col && abs(position.row - bombPosition.row) <= gameInfo.lengthOfBomb
 }
