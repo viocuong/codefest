@@ -182,7 +182,7 @@ class BotExecutor {
 
         // Perform kill competitor
         if (killMode && isNearCompetitor(gameInfo)) {
-            if (performKill(gameInfo, fullPower = false)) {
+            if (performKill(gameInfo, fullPower = true)) {
                 return@coroutineScope
             }
         }
@@ -340,6 +340,6 @@ class BotExecutor {
         const val COMPLETE_EXPOSED_TIME = 700L
         val log = Logger.getLogger(BotExecutor::class.java.name)
         private const val CONTINUE_MOVE_CNT = 3
-        private const val DISTANCE_NEAR_COMPETITOR = 12
+        private const val DISTANCE_NEAR_COMPETITOR = 10
     }
 }
